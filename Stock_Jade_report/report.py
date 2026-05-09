@@ -217,12 +217,12 @@ def main():
         p_net = s_buy - s_sell
         c_net = cum_buy_total - cum_sell_total
         # 報酬率基準：累計購買總額
-        cash_pct = (s_cash / cum_buy_total * 100) if cum_buy_total > 0 else 0
-        final_pct = (s_total / cum_buy_total * 100) if cum_buy_total > 0 else 0
+        cash_pct = (s_cash / p_net * 100) if p_net > 0 else 0
+        final_pct = (s_total / p_net * 100) if p_net > 0 else 0
         
         print(f"該時段投入金額: {p_net:,.0f} 元 ({c_net:,.0f})")
-        print(f"累計現金盈虧 (已實現): {s_cash:,.0f} 元 ({p_net:.2f}%)")
-        print(f"最終預估盈虧 (含持股): {s_total:,.0f} 元 ({p_net:.2f}%)")
+        print(f"累計現金盈虧 (已實現): {s_cash:,.0f} 元 ({cash_pct:.2f}%)")
+        print(f"最終預估盈虧 (含持股): {s_total:,.0f} 元 ({final_pct:.2f}%)")
         print("-" * 110 + "\n")
 
     except Exception as e:
