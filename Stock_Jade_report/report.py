@@ -19,6 +19,10 @@ JSON_PATH = os.path.join(DOC_DIR, 'transactions.json')
 INV_CACHE = os.path.join(DOC_DIR, 'inv_cache.p')
 LOCAL_DATA_DIR = r'C:\jupyter_notebook\ai_twstock\data_independent'
 
+# ANSI 顏色
+YELLOW = "\033[93m"
+RESET = "\033[0m"
+
 def force_float(val):
     if val is None or val == "": return 0.0
     try: return float(val)
@@ -73,10 +77,14 @@ def login_sdk():
     password = "psd.txt"
     if os.path.exists(PSD_PATH):
         with open(PSD_PATH, 'r', encoding='utf-8') as f:
-            p = f.read().strip(); 
+            p = f.read().strip()
             if p: password = p
-    setup_keyring(account); keyring.set_password(TRADE_SDK_ACCOUNT_KEY, account, password); keyring.set_password(TRADE_SDK_CERT_KEY, account, password)
-    sdk = SDK(config); sdk.login(); return sdk
+    setup_keyring(account)
+    keyring.set_password(TRADE_SDK_ACCOUNT_KEY, account, password)
+    keyring.set_password(TRADE_SDK_CERT_KEY, account, password)
+    sdk = SDK(config)
+    sdk.login()
+    return sdk
 
 def update_json_history(tx_list):
     history = {}
@@ -88,7 +96,8 @@ def update_json_history(tx_list):
         t_date = str(g(tx, 't_date'))
         if t_date not in history: history[t_date] = []
         mat_dats = g(tx, 'mat_dats') or []
-        fee = sum(force_float(g(m, 'fee')) for m in mat_dats); tax = sum(force_float(g(m, 'tax')) for m in mat_dats)
+        fee = sum(force_float(g(m, 'fee')) for m in mat_dats)
+        tax = sum(force_float(g(m, 'tax')) for m in mat_dats)
         entry = {"stk_no": g(tx, 'stk_no'), "stk_na": g(tx, 'stk_na'), "side": g(tx, 'buy_sell'), "amount": force_float(g(tx, 'price_qty')), "fee": fee, "tax": tax, "profit": force_float(g(tx, 'make'))}
         if not any(h['stk_no'] == entry['stk_no'] and h['amount'] == entry['amount'] and h['side'] == entry['side'] for h in history[t_date]):
             history[t_date].append(entry)
@@ -105,7 +114,6 @@ def update_json_history(tx_list):
     with open(JSON_PATH, 'w', encoding='utf-8') as f: json.dump(final, f, ensure_ascii=False, indent=2)
 
 def get_stats_for_date(history, inv_map, target_end_date):
-    """計算特定日期為止的總損益與峰值投入"""
     all_tx = []
     peak_cap = 0
     for d_str, tasks in history.items():
@@ -118,15 +126,14 @@ def get_stats_for_date(history, inv_map, target_end_date):
     
     total_cash_p = 0
     total_unrealized = 0
-    # 按股票分組計算
     df = pd.DataFrame(all_tx)
     for s_no, gp in df.groupby('stk_no'):
         inv = inv_map.get(s_no, {"尚餘股數": 0, "均價": 0, "SDK現價": 0})
         p_date = target_end_date if target_end_date < datetime.now() else datetime.now()
         local_p = get_local_price(s_no, p_date)
-        final_p = local_p if local_p is not None else inv["SDK現價"]
+        fp = local_p if local_p is not None else inv["SDK現價"]
         cash_p = gp['profit'].sum()
-        unrealized = (final_p - inv["均價"]) * inv["尚餘股數"] if inv["尚餘股數"] > 0 else 0
+        unrealized = (fp - inv["均價"]) * inv["尚餘股數"] if inv["尚餘股數"] > 0 else 0
         total_cash_p += cash_p
         total_unrealized += unrealized
     return df, total_cash_p + total_unrealized, peak_cap
@@ -137,87 +144,96 @@ def main():
     args = parser.parse_args()
 
     today = datetime.now()
-    if args.mode != 0:
-        try:
-            sdk = login_sdk()
-            inv_raw = sdk.get_inventories()
-            with open(INV_CACHE, 'wb') as f: pickle.dump(inv_raw, f)
-            s_sync = (today - timedelta(days=365)).strftime("%Y-%m-%d") if args.mode == -1 else f"{today.year}-{args.mode:02d}-01"
-            res = sdk.get_transactions_by_date(s_sync, today.strftime("%Y-%m-%d"))
-            if res: update_json_history(res)
-        except: pass
-    
-    if not os.path.exists(JSON_PATH): return
-    with open(JSON_PATH, 'r', encoding='utf-8') as f: history = json.load(f)
-    inv_map = {}
-    if os.path.exists(INV_CACHE):
-        with open(INV_CACHE, 'rb') as f:
-            for item in pickle.load(f):
-                s_no = g(item, 'stk_no'); q = force_float(g(item, 'cost_qty')); c_sum = abs(force_float(g(item, 'cost_sum')))
-                inv_map[s_no] = {"尚餘股數": q, "均價": c_sum / q if q > 0 else 0, "SDK現價": force_float(g(item, 'price_mkt'))}
-
-    # 1. 決定顯示月份範圍 (從 2 月到指定月份或 5 月)
-    target_month = args.mode if 1 <= args.mode <= 12 else today.month
-    months_to_show = list(range(2, target_month + 1))
-    
-    monthly_report = []
-    # 為了計算差額，我們從 1 月開始算
-    prev_total_pl = 0
-    for m in range(1, target_month + 1):
-        m_end = datetime(today.year, m, calendar.monthrange(today.year, m)[1])
-        _, total_pl, peak = get_stats_for_date(history, inv_map, m_end)
+    try:
+        if not os.path.exists(DOC_DIR): os.makedirs(DOC_DIR)
         
-        diff = total_pl - prev_total_pl
-        diff_pct = (diff / peak * 100) if peak > 0 else 0
-        
-        if m in months_to_show:
-            monthly_report.append({"月份": f"{today.year}-{m:02d}", "總投入金額": peak, "盈虧差額": diff, "比例": diff_pct})
-        prev_total_pl = total_pl
+        # 1. SDK 同步
+        if args.mode != 0:
+            try:
+                sdk = login_sdk()
+                inv_raw = sdk.get_inventories()
+                with open(INV_CACHE, 'wb') as f: 
+                    pickle.dump(inv_raw, f)
+                
+                s_sync = (today - timedelta(days=365)).strftime("%Y-%m-%d") if args.mode == -1 else f"{today.year}-{args.mode:02d}-01"
+                res = sdk.get_transactions_by_date(s_sync, today.strftime("%Y-%m-%d"))
+                if res: update_json_history(res)
+            except Exception: pass
+        else:
+            if os.path.exists(JSON_PATH): update_json_history([])
 
-    # 3. 顯示目前選定月份的個股細節 (2020 ~ 指定月底)
-    rep_end = datetime(today.year, target_month, calendar.monthrange(today.year, target_month)[1])
-    df_p, current_total_pl, current_peak = get_stats_for_date(history, inv_map, rep_end)
-    
-    if df_p is not None:
-        rows = []
-        for s_no, gp in df_p.groupby('stk_no'):
-            inv = inv_map.get(s_no, {"尚餘股數": 0, "均價": 0, "SDK現價": 0})
-            p_date = rep_end if rep_end < today else today
-            lp = get_local_price(s_no, p_date)
-            fp = lp if lp is not None else inv["SDK現價"]
-            cash_p = gp['profit'].sum()
-            unrealized = (fp - inv["均價"]) * inv["尚餘股數"] if inv["尚餘股數"] > 0 else 0
-            rows.append({"編號": s_no, "公司": gp['stk_na'].iloc[-1], "購買金額": gp[gp['side']=='B']['amount'].sum(), "賣出金額": gp[gp['side']=='S']['amount'].sum(), "現金盈虧": cash_p, "尚餘股數": inv["尚餘股數"], "均價": inv["均價"], "現價": fp, "總盈虧": cash_p + unrealized})
-        
-        print("\n" + "="*110 + f"\n  投資績效明細表 (2020-01-01 ~ {rep_end.strftime('%Y-%m-%d')})\n" + "="*110)
-        headers = ["編號", "公司", "購買金額", "賣出金額", "現金盈虧", "尚餘股數", "均價", "現價", "總盈虧"]
-        widths = [8, 14, 12, 12, 12, 10, 10, 10, 12]
-        print("".join(pad_to_width(h, w) for h, w in zip(headers, widths)))
-        print("-" * 110)
-        for r in rows:
-            print("".join(pad_to_width(r[k] if isinstance(r[k], str) else f"{r[k]:,.0f}" if '金額' in k or '盈虧' in k else f"{r[k]:.2f}" if '價' in k else f"{r[k]}", w) for k, w in zip(["編號", "公司", "購買金額", "賣出金額", "現金盈虧", "尚餘股數", "均價", "現價", "總盈虧"], widths)))
-        
-        print("-" * 110)
-        s_cash = sum(r['現金盈虧'] for r in rows); s_buy = sum(r['購買金額'] for r in rows)
-        print(f"該時段投入金額 (最高成本): {current_peak:,.0f} 元")
-        print(f"累計現金盈虧 (已實現): {s_cash:,.0f} 元 ({(s_cash/current_peak*100):.2f}%)")
-        print(f"最終預估盈虧 (含持股): {current_total_pl:,.0f} 元 ({(current_total_pl/current_peak*100):.2f}%)")
-        print("-" * 110 + "\n")
+        # 2. 數據載入
+        inv_map = {}
+        if os.path.exists(INV_CACHE):
+            with open(INV_CACHE, 'rb') as f:
+                for item in pickle.load(f):
+                    s_no = g(item, 'stk_no')
+                    q = force_float(g(item, 'cost_qty'))
+                    c_sum = abs(force_float(g(item, 'cost_sum')))
+                    inv_map[s_no] = {"尚餘股數": q, "均價": c_sum / q if q > 0 else 0, "SDK現價": force_float(g(item, 'price_mkt'))}
 
+        if not os.path.exists(JSON_PATH): return
+        with open(JSON_PATH, 'r', encoding='utf-8') as f: history = json.load(f)
 
-    # 2. 顯示月份對比表
-    print("\n" + "="*80 + "\n  各月份投資績效變動表\n" + "="*80)
-    m_headers = ["月份", "總盈虧差額", "總投入金額", "比例 (%)"]
-    m_widths = [9, 12, 12, 10]
-    print("".join(pad_to_width(h, w) for h, w in zip(m_headers, m_widths)))
-    print("-" * 80)
-    for r in monthly_report:
-        line = pad_to_width(r["月份"], m_widths[0])
-        line += pad_to_width(f"{r['盈虧差額']:,.0f}", m_widths[2],'right')
-        line += pad_to_width(f"{r['總投入金額']:,.0f}", m_widths[1],'right')
-        line += pad_to_width(f"{r['比例']:.2f}%", m_widths[3],'right')
-        print(line)
-    print("-" * 80)
-    
+        # --- 3. 月份變動表 ---
+        target_month = args.mode if 1 <= args.mode <= 12 else today.month
+        months_to_show = list(range(2, target_month + 1))
+        
+        monthly_report = []
+        prev_total_pl = 0
+        for m in range(1, target_month + 1):
+            m_end = datetime(today.year, m, calendar.monthrange(today.year, m)[1])
+            _, total_pl, peak = get_stats_for_date(history, inv_map, m_end)
+            diff = total_pl - prev_total_pl
+            diff_pct = (diff / peak * 100) if peak > 0 else 0
+            if m in months_to_show:
+                m_label = f"{today.year}-{m:02d}"
+                if m == target_month: m_label = f"*{m_label}"
+                monthly_report.append({"月份": m_label, "總投入": peak, "差額": diff, "比例": diff_pct})
+            prev_total_pl = total_pl
+
+        print("\n" + "="*50 + "\n  各月份投資績效變動表\n" + "="*50)
+        m_headers = ["月份", "總盈虧差額", "總投入金額", "比例 (%)"]
+        m_widths = [9, 12, 12, 10]
+        print("".join(pad_to_width(h, w) for h, w in zip(m_headers, m_widths)))
+        print("-" * 50)
+        for r in monthly_report:
+            line = pad_to_width(r["月份"], m_widths[0])
+            line += pad_to_width(f"{r['差額']:,.0f}", m_widths[1])
+            line += pad_to_width(f"{r['總投入']:,.0f}", m_widths[2])
+            line += pad_to_width(f"{r['比例']:.2f}%", m_widths[3])
+            if '*' in r["月份"]: print(f"{YELLOW}{line}{RESET}")
+            else: print(line)
+        print("-" * 50)
+
+        # --- 4. 詳細對帳表 ---
+        rep_end = datetime(today.year, target_month, calendar.monthrange(today.year, target_month)[1])
+        df_p, current_total_pl, current_peak = get_stats_for_date(history, inv_map, rep_end)
+        if df_p is not None:
+            rows = []
+            for s_no, gp in df_p.groupby('stk_no'):
+                inv = inv_map.get(s_no, {"尚餘股數": 0, "均價": 0, "SDK現價": 0})
+                lp = get_local_price(s_no, rep_end if rep_end < today else today); fp = lp if lp is not None else inv["SDK現價"]
+                cash_p = gp['profit'].sum(); unrealized = (fp - inv["均價"]) * inv["尚餘股數"] if inv["尚餘股數"] > 0 else 0
+                rows.append({"編號": s_no, "公司": gp['stk_na'].iloc[-1], "購買金額": gp[gp['side']=='B']['amount'].sum(), "賣出金額": gp[gp['side']=='S']['amount'].sum(), "現金盈虧": cash_p, "尚餘股數": inv["尚餘股數"], "均價": inv["均價"], "現價": fp, "總盈虧": cash_p + unrealized})
+            
+            print("\n" + "="*110 + f"\n  投資績效明細表 (2020-01-01 ~ {rep_end.strftime('%Y-%m-%d')})\n" + "="*110)
+            h_cols = ["編號", "公司", "購買金額", "賣出金額", "現金盈虧", "尚餘股數", "均價", "現價", "總盈虧"]
+            h_wids = [8, 14, 12, 12, 12, 10, 10, 10, 12]
+            print("".join(pad_to_width(h, w) for h, w in zip(h_cols, h_wids)))
+            print("-" * 110)
+            for r in rows:
+                print("".join(pad_to_width(r[k] if isinstance(r[k], str) else f"{r[k]:,.0f}" if '金額' in k or '盈虧' in k else f"{r[k]:.2f}" if '價' in k else f"{r[k]}", w) for k, w in zip(h_cols, h_wids)))
+            print("-" * 110)
+            s_cash = sum(r['現金盈虧'] for r in rows)
+            print(f"該時段投入金額 (最高成本): {current_peak:,.0f} 元")
+            print(f"累計現金盈虧 (已實現): {s_cash:,.0f} 元 ({(s_cash/current_peak*100):.2f}%)")
+            print(f"最終預估盈虧 (含持股): {current_total_pl:,.0f} 元 ({(current_total_pl/current_peak*100):.2f}%)")
+            print("-" * 110 + "\n")
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+
 if __name__ == "__main__":
     main()
