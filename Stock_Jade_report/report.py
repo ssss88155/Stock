@@ -212,6 +212,9 @@ def main():
                 lp = get_local_price(s_no, rep_end if rep_end < today else today); fp = lp if lp is not None else inv["SDK現價"]
                 cash_p = gp['profit'].sum(); unrealized = (fp - inv["均價"]) * inv["尚餘股數"] if inv["尚餘股數"] > 0 else 0
                 rows.append({"編號": s_no, "公司": gp['stk_na'].iloc[-1], "購買金額": gp[gp['side']=='B']['amount'].sum(), "賣出金額": gp[gp['side']=='S']['amount'].sum(), "現金盈虧": cash_p, "尚餘股數": inv["尚餘股數"], "均價": inv["均價"], "現價": fp, "總盈虧": cash_p + unrealized})
+            # 排序：有股數的在前，0股數的在後
+            rows.sort(key=lambda x: x["尚餘股數"] == 0)
+            
             print("\n" + "="*110 + f"\n  投資績效明細表 (至 {rep_end.strftime('%Y-%m-%d')})\n" + "="*110)
             h_cols = ["編號", "公司", "購買金額", "賣出金額", "現金盈虧", "尚餘股數", "均價", "現價", "總盈虧"]
             h_wids = [8, 14, 12, 12, 12, 10, 10, 10, 12]
