@@ -1,0 +1,28 @@
+# Ignore everything by default
+/*
+
+# Allow folders to be tracked
+!/ai_twstock/
+!/Stock_Jade_report/
+!/.gitignore
+
+# Exclude specific heavy or sensitive files within folders
+**/data/
+**/doc/
+**/*.json
+**/*.xlsx
+**/*.p
+**/*.p12
+**/*.whl
+**/psd.txt
+**/config.ini
+**/config.simulation.ini
+
+# Common IDE and Python ignores
+.idea/
+.venv/
+venv/
+**/venv/
+__pycache__/
+*.pyc
+.DS_Store
