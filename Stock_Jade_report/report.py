@@ -21,7 +21,7 @@ LOCAL_DATA_DIR = r'C:\jupyter_notebook\ai_twstock\data_independent'
 
 # ANSI 顏色
 YELLOW = "\033[93m"
-GRAY = "\033[37m"
+GRAY = "\033[95m"
 RESET = "\033[0m"
 
 def force_float(val):
@@ -232,3 +232,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
