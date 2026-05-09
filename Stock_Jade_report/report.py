@@ -21,6 +21,7 @@ LOCAL_DATA_DIR = r'C:\jupyter_notebook\ai_twstock\data_independent'
 
 # ANSI 顏色
 YELLOW = "\033[93m"
+GRAY = "\033[37m"
 RESET = "\033[0m"
 
 def force_float(val):
@@ -152,7 +153,7 @@ def main():
             try:
                 sdk = login_sdk()
                 inv_raw = sdk.get_inventories()
-                with open(INV_CACHE, 'wb') as f: 
+                with open(INV_CACHE, 'wb') as f:
                     pickle.dump(inv_raw, f)
                 
                 s_sync = (today - timedelta(days=365)).strftime("%Y-%m-%d") if args.mode == -1 else f"{today.year}-{args.mode:02d}-01"
@@ -162,7 +163,6 @@ def main():
         else:
             if os.path.exists(JSON_PATH): update_json_history([])
 
-        # 2. 數據載入
         inv_map = {}
         if os.path.exists(INV_CACHE):
             with open(INV_CACHE, 'rb') as f:
@@ -175,10 +175,9 @@ def main():
         if not os.path.exists(JSON_PATH): return
         with open(JSON_PATH, 'r', encoding='utf-8') as f: history = json.load(f)
 
-        # --- 3. 月份變動表 ---
+        # --- 2. 月份變動表 ---
         target_month = args.mode if 1 <= args.mode <= 12 else today.month
         months_to_show = list(range(2, target_month + 1))
-        
         monthly_report = []
         prev_total_pl = 0
         for m in range(1, target_month + 1):
@@ -198,15 +197,12 @@ def main():
         print("".join(pad_to_width(h, w) for h, w in zip(m_headers, m_widths)))
         print("-" * 50)
         for r in monthly_report:
-            line = pad_to_width(r["月份"], m_widths[0])
-            line += pad_to_width(f"{r['差額']:,.0f}", m_widths[1])
-            line += pad_to_width(f"{r['總投入']:,.0f}", m_widths[2])
-            line += pad_to_width(f"{r['比例']:.2f}%", m_widths[3])
+            line = pad_to_width(r["月份"], m_widths[0]) + pad_to_width(f"{r['差額']:,.0f}", m_widths[1]) + pad_to_width(f"{r['總投入']:,.0f}", m_widths[2]) + pad_to_width(f"{r['比例']:.2f}%", m_widths[3])
             if '*' in r["月份"]: print(f"{YELLOW}{line}{RESET}")
             else: print(line)
         print("-" * 50)
 
-        # --- 4. 詳細對帳表 ---
+        # --- 3. 詳細對帳表 ---
         rep_end = datetime(today.year, target_month, calendar.monthrange(today.year, target_month)[1])
         df_p, current_total_pl, current_peak = get_stats_for_date(history, inv_map, rep_end)
         if df_p is not None:
@@ -216,24 +212,23 @@ def main():
                 lp = get_local_price(s_no, rep_end if rep_end < today else today); fp = lp if lp is not None else inv["SDK現價"]
                 cash_p = gp['profit'].sum(); unrealized = (fp - inv["均價"]) * inv["尚餘股數"] if inv["尚餘股數"] > 0 else 0
                 rows.append({"編號": s_no, "公司": gp['stk_na'].iloc[-1], "購買金額": gp[gp['side']=='B']['amount'].sum(), "賣出金額": gp[gp['side']=='S']['amount'].sum(), "現金盈虧": cash_p, "尚餘股數": inv["尚餘股數"], "均價": inv["均價"], "現價": fp, "總盈虧": cash_p + unrealized})
-            
-            print("\n" + "="*110 + f"\n  投資績效明細表 (2020-01-01 ~ {rep_end.strftime('%Y-%m-%d')})\n" + "="*110)
+            print("\n" + "="*110 + f"\n  投資績效明細表 (至 {rep_end.strftime('%Y-%m-%d')})\n" + "="*110)
             h_cols = ["編號", "公司", "購買金額", "賣出金額", "現金盈虧", "尚餘股數", "均價", "現價", "總盈虧"]
             h_wids = [8, 14, 12, 12, 12, 10, 10, 10, 12]
             print("".join(pad_to_width(h, w) for h, w in zip(h_cols, h_wids)))
             print("-" * 110)
             for r in rows:
-                print("".join(pad_to_width(r[k] if isinstance(r[k], str) else f"{r[k]:,.0f}" if '金額' in k or '盈虧' in k else f"{r[k]:.2f}" if '價' in k else f"{r[k]}", w) for k, w in zip(h_cols, h_wids)))
+                line_content = "".join(pad_to_width(r[k] if isinstance(r[k], str) else f"{r[k]:,.0f}" if '金額' in k or '盈虧' in k else f"{r[k]:.2f}" if '價' in k else f"{r[k]}", w) for k, w in zip(h_cols, h_wids))
+                if r["尚餘股數"] == 0: print(f"{GRAY}{line_content}{RESET}")
+                else: print(line_content)
             print("-" * 110)
             s_cash = sum(r['現金盈虧'] for r in rows)
             print(f"該時段投入金額 (最高成本): {current_peak:,.0f} 元")
             print(f"累計現金盈虧 (已實現): {s_cash:,.0f} 元 ({(s_cash/current_peak*100):.2f}%)")
             print(f"最終預估盈虧 (含持股): {current_total_pl:,.0f} 元 ({(current_total_pl/current_peak*100):.2f}%)")
             print("-" * 110 + "\n")
-
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
+    except Exception:
+        import traceback; traceback.print_exc()
 
 if __name__ == "__main__":
     main()
