@@ -21,7 +21,7 @@ LOCAL_DATA_DIR = r'C:\jupyter_notebook\ai_twstock\data_independent'
 
 # ANSI 顏色
 YELLOW = "\033[93m"
-GRAY = "\033[95m"
+GRAY = "\033[2m"
 RESET = "\033[0m"
 
 def force_float(val):
@@ -175,34 +175,9 @@ def main():
         if not os.path.exists(JSON_PATH): return
         with open(JSON_PATH, 'r', encoding='utf-8') as f: history = json.load(f)
 
-        # --- 2. 月份變動表 ---
+        # --- 3. 詳細對帳表 ---
         target_month = args.mode if 1 <= args.mode <= 12 else today.month
         months_to_show = list(range(2, target_month + 1))
-        monthly_report = []
-        prev_total_pl = 0
-        for m in range(1, target_month + 1):
-            m_end = datetime(today.year, m, calendar.monthrange(today.year, m)[1])
-            _, total_pl, peak = get_stats_for_date(history, inv_map, m_end)
-            diff = total_pl - prev_total_pl
-            diff_pct = (diff / peak * 100) if peak > 0 else 0
-            if m in months_to_show:
-                m_label = f"{today.year}-{m:02d}"
-                if m == target_month: m_label = f"*{m_label}"
-                monthly_report.append({"月份": m_label, "總投入": peak, "差額": diff, "比例": diff_pct})
-            prev_total_pl = total_pl
-
-        print("\n" + "="*50 + "\n  各月份投資績效變動表\n" + "="*50)
-        m_headers = ["月份", "總盈虧差額", "總投入金額", "比例 (%)"]
-        m_widths = [9, 12, 12, 10]
-        print("".join(pad_to_width(h, w) for h, w in zip(m_headers, m_widths)))
-        print("-" * 50)
-        for r in monthly_report:
-            line = pad_to_width(r["月份"], m_widths[0]) + pad_to_width(f"{r['差額']:,.0f}", m_widths[1]) + pad_to_width(f"{r['總投入']:,.0f}", m_widths[2]) + pad_to_width(f"{r['比例']:.2f}%", m_widths[3])
-            if '*' in r["月份"]: print(f"{YELLOW}{line}{RESET}")
-            else: print(line)
-        print("-" * 50)
-
-        # --- 3. 詳細對帳表 ---
         rep_end = datetime(today.year, target_month, calendar.monthrange(today.year, target_month)[1])
         df_p, current_total_pl, current_peak = get_stats_for_date(history, inv_map, rep_end)
         if df_p is not None:
@@ -229,7 +204,36 @@ def main():
             print(f"該時段投入金額 (最高成本): {current_peak:,.0f} 元")
             print(f"累計現金盈虧 (已實現): {s_cash:,.0f} 元 ({(s_cash/current_peak*100):.2f}%)")
             print(f"最終預估盈虧 (含持股): {current_total_pl:,.0f} 元 ({(current_total_pl/current_peak*100):.2f}%)")
-            print("-" * 110 + "\n")
+            print("-" * 43 + "\n")
+
+
+        # --- 2. 月份變動表 ---
+        monthly_report = []
+        prev_total_pl = 0
+        for m in range(1, target_month + 1):
+            m_end = datetime(today.year, m, calendar.monthrange(today.year, m)[1])
+            _, total_pl, peak = get_stats_for_date(history, inv_map, m_end)
+            diff = total_pl - prev_total_pl
+            diff_pct = (diff / peak * 100) if peak > 0 else 0
+            if m in months_to_show:
+                m_label = f"{today.year}-{m:02d}"
+                if m == target_month: m_label = f"*{m_label}"
+                monthly_report.append({"月份": m_label, "總投入": peak, "差額": diff, "比例": diff_pct})
+            prev_total_pl = total_pl
+
+        m_headers = ["月份", "總盈虧差額", "總投入金額", "比例 (%)"]
+        m_widths = [9, 12, 12, 10]
+        print("".join(pad_to_width(h, w) for h, w in zip(m_headers, m_widths)))
+        print("-" * 50)
+        for r in monthly_report:
+            line = pad_to_width(r["月份"], m_widths[0]) 
+            line += pad_to_width(f"{r['差額']:,.0f}", m_widths[1]) 
+            line += pad_to_width(f"{r['總投入']:,.0f}", m_widths[2]) 
+            line += pad_to_width(f"{r['比例']:.2f}%", m_widths[3])
+            if '*' in r["月份"]: print(f"{YELLOW}{line}{RESET}")
+            else: print(line)
+        print("-" * 50)
+
     except Exception:
         import traceback; traceback.print_exc()
 
