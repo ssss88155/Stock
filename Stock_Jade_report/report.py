@@ -82,15 +82,13 @@ def login_sdk():
     sdk.login()
     return sdk
 
-def update_json_and_recalc(tx_list):
-    """更新交易紀錄並重新計算「在場成本 (Invested Capital)」"""
+def update_json_history(tx_list):
     history = {}
     if os.path.exists(JSON_PATH):
         with open(JSON_PATH, 'r', encoding='utf-8') as f:
             try: history = json.load(f)
             except: history = {}
 
-    # 1. 併入新交易
     for tx in tx_list:
         t_date = str(g(tx, 't_date'))
         if t_date not in history: history[t_date] = []
@@ -104,76 +102,99 @@ def update_json_and_recalc(tx_list):
         if not any(h['stk_no'] == entry['stk_no'] and h['amount'] == entry['amount'] and h['side'] == entry['side'] for h in history[t_date]):
             history[t_date].append(entry)
 
-    # 2. 重新計算「在場成本水位」(由舊到新)
+    # 計算在場成本 (舊到新)
     sorted_dates = sorted([k for k in history.keys() if k != 'Unknown'])
-    running_cost = 0 
+    rc = 0
     for d in sorted_dates:
-        for entry in history[d]:
-            if entry['side'] == 'B':
-                # 買入：增加成本 (價金 + 手續費)
-                running_cost += (entry['amount'] + entry['fee'])
-            else:
-                # 賣出：減少成本 (賣出價金 - 稅費 - 獲利 = 原始購入成本)
-                fee = entry.get('fee', 0)
-                tax = entry.get('tax', 0)
-                original_cost = entry['amount'] - fee - tax - entry['profit']
-                running_cost -= original_cost
+        for e in history[d]:
+            if e['side'] == 'B': rc += (e['amount'] + e['fee'])
+            else: rc -= (e['amount'] - e.get('fee',0) - e.get('tax',0) - e['profit'])
+        history[d][-1]["invested_capital_snapshot"] = max(0, rc)
+
+    # 排序 (新到舊)
+    final = OrderedDict()
+    for d in sorted(sorted_dates, reverse=True): final[d] = history[d]
+    if 'Unknown' in history: final['Unknown'] = history['Unknown']
+    with open(JSON_PATH, 'w', encoding='utf-8') as f: json.dump(final, f, ensure_ascii=False, indent=2)
+
+def calculate_report(history, inv_map, target_end_date):
+    """根據截止日期彙整報表數據"""
+    all_tx = []
+    for d_str, tasks in history.items():
+        dt = parse_date(d_str)
+        if dt and dt <= target_end_date:
+            for t in tasks:
+                t['dt'] = dt
+                all_tx.append(t)
+    
+    if not all_tx: return None, 0, 0, 0
+
+    df = pd.DataFrame(all_tx).sort_values('dt')
+    peak_cap = 0
+    running_max = 0
+    for d_str, tasks in history.items():
+        dt = parse_date(d_str)
+        if dt and dt <= target_end_date:
+            cap = tasks[-1].get('invested_capital_snapshot', 0)
+            if cap > peak_cap: peak_cap = cap
+
+    report_rows = []
+    for s_no, gp in df.groupby('stk_no'):
+        inv = inv_map.get(s_no, {"尚餘股數": 0, "均價": 0, "SDK現價": 0})
+        # 抓取截止日的本地收盤價
+        p_date = target_end_date if target_end_date < datetime.now() else datetime.now()
+        local_p = get_local_price(s_no, p_date)
+        final_p = local_p if local_p is not None else inv["SDK現價"]
         
-        # 紀錄該日結束時的在場總成本
-        history[d][-1]["invested_capital_snapshot"] = max(0, running_cost)
-
-    # 3. 排序輸出 (新到舊)
-    final_history = OrderedDict()
-    for d in sorted(sorted_dates, reverse=True):
-        final_history[d] = history[d]
-    if 'Unknown' in history: final_history['Unknown'] = history['Unknown']
-
-    with open(JSON_PATH, 'w', encoding='utf-8') as f:
-        json.dump(final_history, f, ensure_ascii=False, indent=2)
+        cash_p = gp['profit'].sum()
+        # 修正：根據歷史價格手動計算未實現盈虧
+        unrealized = (final_p - inv["均價"]) * inv["尚餘股數"] if inv["尚餘股數"] > 0 else 0
+        
+        report_rows.append({
+            "編號": s_no, "公司": gp['stk_na'].iloc[-1],
+            "購買金額": gp[gp['side']=='B']['amount'].sum(),
+            "賣出金額": gp[gp['side']=='S']['amount'].sum(),
+            "現金盈虧": cash_p, "尚餘股數": inv["尚餘股數"], "均價": inv["均價"],
+            "現價": final_p, "總盈虧": cash_p + unrealized
+        })
+    return report_rows, peak_cap, sum(r['現金盈虧'] for r in report_rows), sum(r['總盈虧'] for r in report_rows)
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('mode', type=int, nargs='?', default=0, help='模式 (0:不抓, -1:抓一年, 1-12:抓該月)')
+    parser.add_argument('mode', type=int, nargs='?', default=0)
     args = parser.parse_args()
 
-    report_start = datetime(2020, 1, 1)
+    # 1. 決定區間
+    today = datetime.now()
     report_end = datetime(2099, 12, 31)
+    prev_month_end = None
+    
     if 1 <= args.mode <= 12:
-        y = datetime.now().year
-        ld = calendar.monthrange(y, args.mode)[1]
-        report_end = datetime(y, args.mode, ld)
+        report_end = datetime(today.year, args.mode, calendar.monthrange(today.year, args.mode)[1])
+        # 計算上個月底
+        pm = args.mode - 1
+        py = today.year
+        if pm == 0: pm = 12; py -= 1
+        prev_month_end = datetime(py, pm, calendar.monthrange(py, pm)[1])
 
     try:
         if not os.path.exists(DOC_DIR): os.makedirs(DOC_DIR)
-        inv_map = {}
         
-        # 1. 同步資料
+        # 2. SDK 同步
+        inv_map = {}
         try:
             sdk = login_sdk()
             inv_raw = sdk.get_inventories()
             with open(INV_CACHE, 'wb') as f: pickle.dump(inv_raw, f)
-            
             if args.mode != 0:
-                print(f"[DEBUG] SDK 正在同步模式 {args.mode} 資料...")
-                tx_sync = []
-                if args.mode == -1:
-                    for i in range(12):
-                        s = (datetime.now() - timedelta(days=(i+1)*30)).strftime("%Y-%m-%d")
-                        e = (datetime.now() - timedelta(days=i*30)).strftime("%Y-%m-%d")
-                        res = sdk.get_transactions_by_date(s, e)
-                        if res: tx_sync.extend(res)
-                else:
-                    s_str = datetime(datetime.now().year, args.mode, 1).strftime("%Y-%m-%d")
-                    e_str = min(report_end, datetime.now()).strftime("%Y-%m-%d")
-                    res = sdk.get_transactions_by_date(s_str, e_str)
-                    if res: tx_sync.extend(res)
-                update_json_and_recalc(tx_sync)
-            else:
-                update_json_and_recalc([])
+                s_sync = (report_end - timedelta(days=365)).strftime("%Y-%m-%d") if args.mode == -1 else f"{today.year}-{args.mode:02d}-01"
+                res = sdk.get_transactions_by_date(s_sync, min(report_end, today).strftime("%Y-%m-%d"))
+                if res: update_json_history(res)
+            else: update_json_history([])
         except:
-            if args.mode == 0: update_json_and_recalc([])
+            if os.path.exists(JSON_PATH): update_json_history([])
 
-        # 2. 準備庫存數據
+        # 3. 載入庫存與 JSON
         if os.path.exists(INV_CACHE):
             with open(INV_CACHE, 'rb') as f:
                 ir = pickle.load(f)
@@ -181,81 +202,45 @@ def main():
                     s_no = g(item, 'stk_no')
                     q = force_float(g(item, 'cost_qty'))
                     c_sum = abs(force_float(g(item, 'cost_sum')))
-                    inv_map[s_no] = {
-                        "尚餘股數": q, "均價": c_sum / q if q > 0 else 0, "總成本": c_sum,
-                        "SDK現價": force_float(g(item, 'price_mkt')), "未實現": force_float(g(item, 'make_a_sum'))
-                    }
+                    inv_map[s_no] = {"尚餘股數": q, "均價": c_sum / q if q > 0 else 0, "SDK現價": force_float(g(item, 'price_mkt'))}
 
-        # 3. 讀取與計算
-        if not os.path.exists(JSON_PATH): return
         with open(JSON_PATH, 'r', encoding='utf-8') as f: history = json.load(f)
 
-        all_tx_flat = []
-        for d_str, tasks in history.items():
-            dt = parse_date(d_str)
-            if not dt: continue
-            for t in tasks:
-                t['dt'] = dt
-                all_tx_flat.append(t)
-        
-        df_all = pd.DataFrame(all_tx_flat).sort_values('dt')
-        period_df = df_all[(df_all['dt'] >= report_start) & (df_all['dt'] <= report_end)]
-        
-        if period_df.empty:
-            print(f"⚠️ 在 {report_start.strftime('%Y-%m')} ~ {report_end.strftime('%Y-%m')} 期間無交易紀錄")
-            return
+        # 4. 產生目前與上月報表
+        rows, peak, cash_p, total_p = calculate_report(history, inv_map, report_end)
+        if rows is None: return
 
-        # 找出該時段結束前的「最高投入成本」
-        # 我們直接從 JSON 裡面紀錄的 invested_capital_snapshot 抓取
-        peak_capital = 0
-        for d_str, tasks in history.items():
-            dt = parse_date(d_str)
-            if dt and dt <= report_end:
-                for t in tasks:
-                    cap = t.get('invested_capital_snapshot', 0)
-                    if cap > peak_capital: peak_capital = cap
-
-        report_rows = []
-        for s_no, gp in period_df.groupby('stk_no'):
-            inv = inv_map.get(s_no, {"尚餘股數": 0, "均價": 0, "SDK現價": 0, "未實現": 0, "總成本": 0})
-            price_date = report_end if report_end < datetime.now() else datetime.now()
-            local_price = get_local_price(s_no, price_date)
-            final_price = local_price if local_price is not None else inv["SDK現價"]
-            
-            report_rows.append({
-                "編號": s_no, "公司": gp['stk_na'].iloc[-1],
-                "購買金額": gp[gp['side']=='B']['amount'].sum(),
-                "賣出金額": gp[gp['side']=='S']['amount'].sum(),
-                "現金盈虧": gp['profit'].sum(),
-                "尚餘股數": inv["尚餘股數"], "均價": inv["均價"],
-                "現價": final_price, "總盈虧": gp['profit'].sum() + inv["未實現"]
-            })
-
-        # --- 輸出表格 ---
+        # 5. 輸出
         headers = ["編號", "公司", "購買金額", "賣出金額", "現金盈虧", "尚餘股數", "均價", "現價", "總盈虧"]
         widths = [8, 14, 12, 12, 12, 10, 10, 10, 12]
         print("\n" + "="*110 + f"\n  玉山證券 投資績效彙整報表 (至 {report_end.strftime('%Y-%m-%d')})\n" + "="*110)
         print("".join(pad_to_width(h, w) for h, w in zip(headers, widths)))
         print("-" * 110)
-        for r in report_rows:
+        for r in rows:
             line = pad_to_width(r["編號"], widths[0]) + pad_to_width(r["公司"], widths[1])
             line += pad_to_width(f"{r['購買金額']:,.0f}", widths[2]) + pad_to_width(f"{r['賣出金額']:,.0f}", widths[3])
             line += pad_to_width(f"{r['現金盈虧']:,.0f}", widths[4]) + pad_to_width(f"{r['尚餘股數']:,.0f}", widths[5])
             line += pad_to_width(f"{r['均價']:.2f}", widths[6]) + pad_to_width(f"{r['現價']:.2f}", widths[7])
             line += pad_to_width(f"{r['總盈虧']:,.0f}", widths[8])
             print(line)
-
         print("-" * 110)
-        s_cash = sum(r["現金盈虧"] for r in report_rows)
-        s_total = sum(r["總盈虧"] for r in report_rows)
-        
-        # 績效總結
-        cash_pct = (s_cash / peak_capital * 100) if peak_capital > 0 else 0
-        final_pct = (s_total / peak_capital * 100) if peak_capital > 0 else 0
-        
-        print(f"該時段投入金額 (最高成本): {peak_capital:,.0f} 元")
-        print(f"累計現金盈虧 (已實現): {s_cash:,.0f} 元 ({cash_pct:.2f}%)")
-        print(f"最終預估盈虧 (含持股): {s_total:,.0f} 元 ({final_pct:.2f}%)")
+        print(pad_to_width("總計", widths[0]) + pad_to_width("", widths[1]) + pad_to_width(f"{sum(r['購買金額'] for r in rows):,.0f}", widths[2]) + pad_to_width(f"{sum(r['賣出金額'] for r in rows):,.0f}", widths[3]) + pad_to_width(f"{cash_p:,.0f}", widths[4]) + pad_to_width("", widths[5]) + pad_to_width("", widths[6]) + pad_to_width("", widths[7]) + pad_to_width(f"{total_p:,.0f}", widths[8]))
+        print("=" * 110)
+
+        # 盈虧差額計算
+        diff_str = ""
+        if prev_month_end:
+            _, _, _, prev_total = calculate_report(history, inv_map, prev_month_end)
+            diff = total_p - prev_total
+            diff_pct = (diff / peak * 100) if peak > 0 else 0
+            diff_str = f"*與上月總盈虧差額: {diff:,.0f} 元 ({diff_pct:.2f}%)"
+
+        cash_pct = (cash_p / peak * 100) if peak > 0 else 0
+        final_pct = (total_p / peak * 100) if peak > 0 else 0
+        print(f"該時段投入金額 (最高成本): {peak:,.0f} 元")
+        print(f"累計現金盈虧 (已實現): {cash_p:,.0f} 元 ({cash_pct:.2f}%)")
+        print(f"最終預估盈虧 (含持股): {total_p:,.0f} 元 ({final_pct:.2f}%)")
+        if diff_str: print(diff_str)
         print("-" * 110 + "\n")
 
     except Exception as e:
