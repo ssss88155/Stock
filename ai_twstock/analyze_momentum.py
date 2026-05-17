@@ -187,27 +187,35 @@ def check_resistance_breakout(price_data, sorted_dates, idx):
     is_breakout = current_close >= resistance and resistance > 0
     return is_breakout, resistance
 
-def calculate_score(details):
+def calculate_score(details, weights=None):
+    # 如果沒傳入權重，使用全域預設值
+    w_gain = weights.get('WEIGHT_GAIN', WEIGHT_GAIN) if weights else WEIGHT_GAIN
+    w_vol = weights.get('WEIGHT_VOLUME', WEIGHT_VOLUME) if weights else WEIGHT_VOLUME
+    w_foreign = weights.get('WEIGHT_FOREIGN', WEIGHT_FOREIGN) if weights else WEIGHT_FOREIGN
+    w_sitc = weights.get('WEIGHT_SITC', WEIGHT_SITC) if weights else WEIGHT_SITC
+    w_vcp = weights.get('WEIGHT_VCP', WEIGHT_VCP) if weights else WEIGHT_VCP
+    w_breakout = weights.get('WEIGHT_BREAKOUT', WEIGHT_BREAKOUT) if weights else WEIGHT_BREAKOUT
+
     score = 0
     # 1. 漲幅評分
-    score += (min(100, (details['gain'] / 0.05) * 100) if details['gain'] > 0 else 0) * WEIGHT_GAIN / 100
+    score += (min(100, (details['gain'] / 0.05) * 100) if details['gain'] > 0 else 0) * w_gain / 100
     
     # 2. 交易量突破評分
-    score += (min(100, (details['vol_ratio'] / VOL_BREAKTHROUGH_RATIO) * 100)) * WEIGHT_VOLUME / 100
+    score += (min(100, (details['vol_ratio'] / VOL_BREAKTHROUGH_RATIO) * 100)) * w_vol / 100
     
     # 3. 外資評分 (依連買天數與佔比)
     foreign_score = min(100, details['foreign_days'] * 20)
-    score += foreign_score * WEIGHT_FOREIGN / 100
+    score += foreign_score * w_foreign / 100
     
     # 4. 投信評分
-    score += (min(100, (details['sitc_ratio'] / 1.5) * 100)) * WEIGHT_SITC / 100
+    score += (min(100, (details['sitc_ratio'] / 1.5) * 100)) * w_sitc / 100
     
     # 5. VCP 形態評分
-    score += (details['vcp_score'] if details['vcp_ok'] else 0) * WEIGHT_VCP / 100
+    score += (details['vcp_score'] if details['vcp_ok'] else 0) * w_vcp / 100
     
     # 6. 壓力突破評分
     if details['breakout_ok']: 
-        score += WEIGHT_BREAKOUT
+        score += w_breakout
         
     # 法人共識乘數
     score *= details['inst_multiplier']
@@ -216,10 +224,13 @@ def calculate_score(details):
 
 # --- 主分析函數 ---
 
-def analyze_momentum(data, start_date, end_date):
+def analyze_momentum(data, start_date, end_date, weights=None):
     results = []
     industry_map = load_industry_data()
     
+    # 決定分數顯示門檻 (如果權重變大，可能要調整)
+    min_score = weights.get('MIN_SCORE_TO_PRINT', MIN_SCORE_TO_PRINT) if weights else MIN_SCORE_TO_PRINT
+
     for stock_id, details in data.items():
         price_data = details.get('price', {})
         inst_data = details.get('institutional', {})
@@ -275,9 +286,9 @@ def analyze_momentum(data, start_date, end_date):
             'trading_value': trading_value,
             'resistance': res_level
         }
-        res['score'] = calculate_score(res)
+        res['score'] = calculate_score(res, weights=weights)
         
-        if res['score'] >= MIN_SCORE_TO_PRINT:
+        if res['score'] >= min_score:
             results.append(res)
                 
     results.sort(key=lambda x: (x['score'], x['gain']), reverse=True)

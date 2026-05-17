@@ -207,6 +207,7 @@ def run_backtest(override_config=None, silent=False):
     running_invested_capital = 0
     
     # 3. 模擬交易
+    weights = _config.get('WEIGHTS', None)
     is_daily = (buy_dates_config == "DAILY")
     actual_buy_dates = {}
     if not is_daily:
@@ -232,7 +233,7 @@ def run_backtest(override_config=None, silent=False):
         mom_scores = {}
         if has_holdings or is_daily or (current_date in actual_buy_dates):
             start_date_mom = all_dates[idx - 20] if idx >= 20 else all_dates[0]
-            results = analyze_momentum.analyze_momentum(data, start_date_mom, current_date)
+            results = analyze_momentum.analyze_momentum(data, start_date_mom, current_date, weights=weights)
             mom_scores = {r['stock_id']: r['score'] for r in results}
 
         if has_holdings:

@@ -8,71 +8,54 @@ def run_experiments():
         orig_config = json.load(f)
     orig_buy_dates = orig_config.get('BUY_DATES', [])
 
-    # 參數網格
-    grid = {
-        'BUY_DATES': ["DAILY", orig_buy_dates],
-        'BUY_SCORE_THRESHOLD': [0, 60, 75],
-        'MOMENTUM_EXIT_THRESHOLD': [20, 40],
-        'TAKE_PROFIT_HALF_THRESHOLD': [0.15, 0.25],
-        'STOP_LOSS_THRESHOLD': [-0.07, -0.12],
-        'DAILY_INVEST_POOL': [150000, 300000]
+    # 定義權重組合
+    weight_sets = [
+        {"name": "Original", "WEIGHT_GAIN": 10, "WEIGHT_VOLUME": 15, "WEIGHT_FOREIGN": 30, "WEIGHT_SITC": 15, "WEIGHT_VCP": 20, "WEIGHT_BREAKOUT": 10},
+        {"name": "ForeignFocus", "WEIGHT_GAIN": 10, "WEIGHT_VOLUME": 10, "WEIGHT_FOREIGN": 50, "WEIGHT_SITC": 10, "WEIGHT_VCP": 10, "WEIGHT_BREAKOUT": 10},
+        {"name": "SITCFocus", "WEIGHT_GAIN": 10, "WEIGHT_VOLUME": 10, "WEIGHT_FOREIGN": 10, "WEIGHT_SITC": 50, "WEIGHT_VCP": 10, "WEIGHT_BREAKOUT": 10},
+        {"name": "TechnicalFocus", "WEIGHT_GAIN": 20, "WEIGHT_VOLUME": 20, "WEIGHT_FOREIGN": 10, "WEIGHT_SITC": 10, "WEIGHT_VCP": 20, "WEIGHT_BREAKOUT": 20},
+        {"name": "BreakoutVCP", "WEIGHT_GAIN": 10, "WEIGHT_VOLUME": 10, "WEIGHT_FOREIGN": 10, "WEIGHT_SITC": 10, "WEIGHT_VCP": 30, "WEIGHT_BREAKOUT": 30},
+        {"name": "PureGain", "WEIGHT_GAIN": 50, "WEIGHT_VOLUME": 10, "WEIGHT_FOREIGN": 10, "WEIGHT_SITC": 10, "WEIGHT_VCP": 10, "WEIGHT_BREAKOUT": 10}
+    ]
+
+    # 固定最佳回測參數
+    base_cfg = {
+        'BUY_DATES': orig_buy_dates,
+        'BUY_SCORE_THRESHOLD': 70,
+        'MOMENTUM_EXIT_THRESHOLD': 30,
+        'TAKE_PROFIT_HALF_THRESHOLD': 0.20,
+        'STOP_LOSS_THRESHOLD': -0.10,
+        'DAILY_INVEST_POOL': 200000,
+        'STARTING_CASH': 2000000
     }
 
     results = []
-    
-    # 遞迴跑網格 (簡單起見用巢狀迴圈)
-    count = 0
-    total_runs = 2 * 3 * 2 * 2 * 2 * 2
-    
-    print(f"Starting {total_runs} experiments...")
+    print(f"Starting weight experiments for {len(weight_sets)} sets...")
 
-    for bd in grid['BUY_DATES']:
-        for bst in grid['BUY_SCORE_THRESHOLD']:
-            for met in grid['MOMENTUM_EXIT_THRESHOLD']:
-                for tpht in grid['TAKE_PROFIT_HALF_THRESHOLD']:
-                    for slt in grid['STOP_LOSS_THRESHOLD']:
-                        for dip in grid['DAILY_INVEST_POOL']:
-                            count += 1
-                            cfg = {
-                                'BUY_DATES': bd,
-                                'BUY_SCORE_THRESHOLD': bst,
-                                'MOMENTUM_EXIT_THRESHOLD': met,
-                                'TAKE_PROFIT_HALF_THRESHOLD': tpht,
-                                'STOP_LOSS_THRESHOLD': slt,
-                                'DAILY_INVEST_POOL': dip,
-                                'STARTING_CASH': 2000000 # 給足資金避免卡住
-                            }
-                            
-                            # 執行回測 (silent=True 減少輸出)
-                            res = backtest_momentum.run_backtest(override_config=cfg, silent=True)
-                            
-                            if res:
-                                res['config'] = cfg
-                                results.append(res)
-                                # 簡短列印進度
-                                bd_label = "DAILY" if bd == "DAILY" else "ORIG"
-                                print(f"Run {count}/{total_runs}: {bd_label}, ScoreTH:{bst}, MomExit:{met}, ROI:{res['roi']:.1%}")
+    for ws in weight_sets:
+        cfg = base_cfg.copy()
+        cfg['WEIGHTS'] = ws
+        
+        # 執行回測
+        res = backtest_momentum.run_backtest(override_config=cfg, silent=True)
+        
+        if res:
+            res['weight_name'] = ws['name']
+            res['config'] = cfg
+            results.append(res)
+            print(f"Set: {ws['name']:<15} ROI: {res['roi']:>7.2%}")
 
-    # 排序結果
-    results.sort(key=lambda x: x['total_pl'], reverse=True)
+    # 排序
+    results.sort(key=lambda x: x['roi'], reverse=True)
 
-    print("\n" + "="*100)
-    print(f"{'Rank':<5} {'ROI':<8} {'Total PL':<12} {'Invested':<12} {'BD':<7} {'ScoreTH':<8} {'MomExit':<8} {'TP_Half':<8} {'SL':<8} {'Pool':<8}")
-    print("-" * 100)
-    for i, r in enumerate(results[:30]): # 印出前 30 名
-        cfg = r['config']
-        bd_label = "DAILY" if cfg['BUY_DATES'] == "DAILY" else "ORIG"
-        print(f"{i+1:<5} {r['roi']:>7.1%} {r['total_pl']:>12,.0f} {r['peak_invested']:>12,.0f} {bd_label:<7} {cfg['BUY_SCORE_THRESHOLD']:<8} {cfg['MOMENTUM_EXIT_THRESHOLD']:<8} {cfg['TAKE_PROFIT_HALF_THRESHOLD']:<8} {cfg['STOP_LOSS_THRESHOLD']:<8} {cfg['DAILY_INVEST_POOL']:<8}")
+    print("\n" + "="*120)
+    print(f"{'Rank':<5} {'Weight Set':<15} {'ROI':<8} {'Total PL':<12} {'Invested':<12} {'Gain':<5} {'Vol':<5} {'For':<5} {'SITC':<5} {'VCP':<5} {'Brk':<5}")
+    print("-" * 120)
+    for i, r in enumerate(results):
+        ws = r['config']['WEIGHTS']
+        print(f"{i+1:<5} {r['weight_name']:<15} {r['roi']:>7.2%} {r['total_pl']:>12,.0f} {r['peak_invested']:>12,.0f} {ws['WEIGHT_GAIN']:<5} {ws['WEIGHT_VOLUME']:<5} {ws['WEIGHT_FOREIGN']:<5} {ws['WEIGHT_SITC']:<5} {ws['WEIGHT_VCP']:<5} {ws['WEIGHT_BREAKOUT']:<5}")
 
-    # 詳細報告前 5 名
-    print("\n--- Top 5 Detailed Results ---")
-    for i, r in enumerate(results[:5]):
-        print(f"\n[Rank {i+1}] Profit: {r['total_pl']:,.0f}, ROI: {r['roi']:.2%}")
-        print(f"Config: {json.dumps(r['config'], ensure_ascii=False)}")
-        # 可以列印出具體的投入產出，但因為 user 想要看到每一筆，我會把結果存成檔案或大表
-    
-    # 輸出所有結果到檔案以便 review
-    with open('experiment_results.json', 'w', encoding='utf-8') as f:
+    with open('weight_experiment_results.json', 'w', encoding='utf-8') as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
 
 if __name__ == "__main__":
