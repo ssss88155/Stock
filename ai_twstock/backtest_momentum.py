@@ -297,7 +297,7 @@ def run_backtest(override_config=None, silent=False):
             
             # 使用市場廣度作為過濾器 (Market Breadth Filter)
             breadth = get_market_breadth(idx)
-            if breadth < 0.3: # 市場過於疲弱，不開新倉
+            if breadth < 0.5: # 提高門檻到 50%
                 if not silent: print(f"  [SKIPPED] {current_date} Market Breadth too low: {breadth:.1%}")
                 continue
                 

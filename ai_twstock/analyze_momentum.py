@@ -230,8 +230,16 @@ def analyze_momentum(data, start_date, end_date, weights=None):
     
     min_score = weights.get('MIN_SCORE_TO_PRINT', MIN_SCORE_TO_PRINT) if weights else MIN_SCORE_TO_PRINT
 
+    # 計算大盤 (0050) 同期漲幅作為基準
+    market_gain = 0
+    if '0050' in data:
+        p0050 = data['0050'].get('price', {})
+        if start_date in p0050 and end_date in p0050:
+            market_gain = (p0050[end_date]['close'] - p0050[start_date]['close']) / p0050[start_date]['close']
+
     # 第一輪：計算原始分數
     for stock_id, details in data.items():
+        if stock_id == '0050': continue # 跳過大盤本身
         price_data = details.get('price', {})
         inst_data = details.get('institutional', {})
         if start_date not in price_data or end_date not in price_data: continue
@@ -262,9 +270,16 @@ def analyze_momentum(data, start_date, end_date, weights=None):
             'sitc_ratio': sitc_ratio, 'foreign_days': foreign_days,
             'vcp_ok': vcp_ok, 'vcp_score': vcp_score, 'breakout_ok': breakout_ok,
             'inst_multiplier': inst_multiplier, 'inst_status': inst_status,
-            'raw_volume': current_vol, 'trading_value': trading_value, 'resistance': res_level
+            'raw_volume': current_vol, 'trading_value': trading_value, 'resistance': res_level,
+            'relative_strength': gain - market_gain
         }
         res['score'] = calculate_score(res, weights=weights)
+        
+        # 強勢過濾：如果相對於大盤是弱勢 (RS < 0)，分數打折
+        if res['relative_strength'] < 0:
+            res['score'] *= 0.5
+        elif res['relative_strength'] > 0.05:
+            res['score'] *= 1.2 # 超額報酬加成
         results.append(res)
     
     # 第二輪：產業集群加成 (Sector Momentum Bonus)
