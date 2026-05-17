@@ -40,7 +40,7 @@ def load_config():
             print(f"[WARN] 載入設定檔失敗: {e}")
     return {}
 
-DATA_FILE = 'stock_data.json'
+DATA_FILE = 'stock_data_slim.json'
 STOCKS_INFO_FILE = 'taiwan_stocks.csv'
 EXPORT_PATH = os.path.join('temp_data', 'backtest_transactions.json')
 EXCEL_EXPORT_PATH = os.path.join('temp_data', 'backtest_report.xlsx')
