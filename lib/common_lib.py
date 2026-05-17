@@ -11,7 +11,8 @@ class Color:
     BLUE = '\033[94m'
     PURPLE = '\033[95m'
     CYAN = '\033[96m'
-    GRAY = '\033[90m' # 改用 90 (深灰色) 避免與白色混淆
+    GRAY = '\033[90m'
+    DIM = '\033[2m' # 讓文字變淡的代碼
     ORANGE = '\033[38;5;208m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'

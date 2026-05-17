@@ -128,16 +128,16 @@ def main():
     help_text = (
         "玉山證券投資績效報告工具\n"
         "參數用途說明：\n"
-        "  [0]    : (預設) 讀取本地快取資料，不連接 SDK (最快)\n"
-        "  [-1]   : 【唯一同步模式】連接 SDK 更新最新庫存與成交紀錄\n"
-        "  [1-12] : 分析指定月份 (不更新資料，如需更新請先執行 -1)\n"
+        "  [0]    : (預設) 讀取本地快取資料，不連接 SDK (省時)\n"
+        "  [-1]   : 【唯一連線模式】連接 SDK 更新最新庫存與成交紀錄\n"
+        "  [1-12] : 分析指定月份 (不自動更新資料，若需更新請用 -1)\n"
     )
     
     parser = argparse.ArgumentParser(description='玉山證券投資績效報告工具', formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('mode', type=int, nargs='?', default=0, help='執行模式')
     args = parser.parse_args()
 
-    # 執行時印出參數功能
+    # 執行時立刻印出功能說明
     print("-" * 60)
     print(help_text)
     print("-" * 60)
@@ -146,26 +146,25 @@ def main():
     try:
         if not os.path.exists(DOC_DIR): os.makedirs(DOC_DIR)
         
-        # 修改邏輯：只有 -1 模式才去爬即時資料
+        # 嚴格限制：只有 -1 才同步 SDK
         if args.mode == -1:
             try:
                 print(f"[INFO] 正在連接玉山 SDK 同步即時資料...")
                 sdk = login_sdk()
                 
-                # 1. 更新庫存
+                # 更新庫存
                 inv_raw = sdk.get_inventories()
                 with open(INV_CACHE, 'wb') as f: 
                     pickle.dump(inv_raw, f)
                 
-                # 2. 更新成交紀錄 (同步過去 90 天)
+                # 同步成交紀錄 (處理日期限制)
                 s_sync = (today - timedelta(days=90)).strftime("%Y-%m-%d")
                 e_sync = today.strftime("%Y-%m-%d")
-                
                 try:
                     res = sdk.get_transactions_by_date(s_sync, e_sync)
                 except ValueError as ve:
                     if "AW00002" in str(ve):
-                        print("[INFO] 偵測到日期範圍限制，自動縮短至 30 天...")
+                        print("[INFO] 偵測到 SDK 日期範圍限制，嘗試同步最近 30 天...")
                         s_sync = (today - timedelta(days=30)).strftime("%Y-%m-%d")
                         res = sdk.get_transactions_by_date(s_sync, e_sync)
                     else: raise ve
@@ -174,14 +173,13 @@ def main():
                     update_json_history(res)
                     print(f"[SUCCESS] 資料更新成功，同步 {len(res)} 筆紀錄。")
                 else:
-                    print(f"[INFO] SDK 同步完成，但無新成交紀錄。")
+                    print(f"[INFO] SDK 同步完成，區間內無新成交紀錄。")
                     update_json_history([])
             except Exception as e:
-                print(f"[ERROR] SDK 更新失敗: {e}")
+                print(f"[ERROR] SDK 同步失敗: {e}，將使用本地快取。")
                 if os.path.exists(JSON_PATH): update_json_history([])
         else:
-            # 模式 0 或 1-12：直接從快取載入，不進行 SDK 連線
-            print(f"[INFO] 執行模式 {args.mode}：使用本地快取資料。")
+            print(f"[INFO] 執行模式 {args.mode}：不連接 SDK，讀取本地快取。")
             if os.path.exists(JSON_PATH): 
                 update_json_history([])
 
@@ -199,39 +197,7 @@ def main():
 
         target_month = args.mode if 1 <= args.mode <= 12 else today.month
         
-        # --- 1. 月份變動表 ---
-        months_to_show = list(range(2, target_month + 1))
-        monthly_report = []
-        prev_total_pl = 0
-        for m in range(1, target_month + 1):
-            m_end = datetime(today.year, m, calendar.monthrange(today.year, m)[1])
-            _, total_pl, peak = get_stats_for_date(history, inv_map, m_end)
-            diff = total_pl - prev_total_pl
-            diff_pct = (diff / peak * 100) if peak > 0 else 0
-            if m in months_to_show:
-                m_label = f"{today.year}-{m:02d}"
-                if m == target_month: m_label = f"*{m_label}"
-                monthly_report.append({"月份": m_label, "總投入": peak, "差額": diff, "比例": diff_pct})
-            prev_total_pl = total_pl
-
-        print("\n" + "="*55 + "\n  各月份投資績效變動表\n" + "="*55)
-        m_headers = ["月份", "總盈虧差額", "總投入金額", "比例 (%)"]
-        m_widths = [11, 14, 14, 12]
-        print("".join(pad_string(h, w, 'center') for h, w in zip(m_headers, m_widths)))
-        print("-" * 55)
-        for r in monthly_report:
-            line = pad_string(r["月份"], m_widths[0], 'left')
-            line += pad_string(f"{r['差額']:,.0f}", m_widths[1], 'right')
-            line += pad_string(f"{r['總投入']:,.0f}", m_widths[2], 'right')
-            line += pad_string(f"{r['比例']:.2f}%", m_widths[3], 'right')
-            if '*' in r["月份"]: print(Color.wrap(line, Color.YELLOW))
-            else: print(line)
-        print("-" * 55)
-
-        # --- 2. 詳細對帳表 ---
-        rep_end = datetime(today.year, target_month, calendar.monthrange(today.year, target_month)[1])
-        df_p, current_total_pl, current_peak = get_stats_for_date(history, inv_map, rep_end)
-        
+        # 找出分析月份有交易的股票
         this_month_start = datetime(today.year, target_month, 1)
         this_month_end = datetime(today.year, target_month, calendar.monthrange(today.year, target_month)[1])
         traded_this_month = set()
@@ -239,6 +205,9 @@ def main():
             dt = parse_date(d_str)
             if dt and this_month_start <= dt <= this_month_end:
                 for t in tasks: traded_this_month.add(t['stk_no'])
+
+        rep_end = datetime(today.year, target_month, calendar.monthrange(today.year, target_month)[1])
+        df_p, current_total_pl, current_peak = get_stats_for_date(history, inv_map, rep_end)
 
         if df_p is not None:
             rows = []
@@ -265,9 +234,9 @@ def main():
                 line += pad_string(f"{r['現價']:.2f}", h_wids[7], 'right')
                 line += pad_string(f"{r['總盈虧']:,.0f}", h_wids[8], 'right')
                 
-                # 灰色顯示邏輯：若庫存股數為 0，代表已結清，顯示為灰色
-                if r["尚餘股數"] <= 0:
-                    print(Color.wrap(line, Color.GRAY))
+                # 只有當 (尚餘股數為 0) 且 (本月完全沒交易) 時才變淡 (Color.DIM)
+                if r["尚餘股數"] == 0 and r["編號"] not in traded_this_month:
+                    print(Color.wrap(line, Color.DIM))
                 else:
                     print(line)
             print("-" * 110)
@@ -276,6 +245,36 @@ def main():
             print(f"累計現金盈虧 (已實現): {s_cash:,.0f} 元 ({(s_cash/current_peak*100):.2f}%)")
             print(f"最終預估盈虧 (含持股): {current_total_pl:,.0f} 元 ({(current_total_pl/current_peak*100):.2f}%)")
             print("-" * 110 + "\n")
+
+        # --- 月份變動表 ---
+        months_to_show = list(range(2, target_month + 1))
+        monthly_report = []
+        prev_total_pl = 0
+        for m in range(1, target_month + 1):
+            m_end = datetime(today.year, m, calendar.monthrange(today.year, m)[1])
+            _, total_pl, peak = get_stats_for_date(history, inv_map, m_end)
+            diff = total_pl - prev_total_pl
+            diff_pct = (diff / peak * 100) if peak > 0 else 0
+            if m in months_to_show:
+                m_label = f"{today.year}-{m:02d}"
+                if m == target_month: m_label = f"*{m_label}"
+                monthly_report.append({"月份": m_label, "總投入": peak, "差額": diff, "比例": diff_pct})
+            prev_total_pl = total_pl
+
+        print("="*55 + "\n  各月份投資績效變動表\n" + "="*55)
+        m_headers = ["月份", "總盈虧差額", "總投入金額", "比例 (%)"]
+        m_widths = [11, 14, 14, 12]
+        print("".join(pad_string(h, w, 'center') for h, w in zip(m_headers, m_widths)))
+        print("-" * 55)
+        for r in monthly_report:
+            line = pad_string(r["月份"], m_widths[0], 'left')
+            line += pad_string(f"{r['差額']:,.0f}", m_widths[1], 'right')
+            line += pad_string(f"{r['總投入']:,.0f}", m_widths[2], 'right')
+            line += pad_string(f"{r['比例']:.2f}%", m_widths[3], 'right')
+            if '*' in r["月份"]: print(Color.wrap(line, Color.YELLOW))
+            else: print(line)
+        print("-" * 55)
+
     except Exception:
         import traceback; traceback.print_exc()
 
