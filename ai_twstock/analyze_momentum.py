@@ -18,14 +18,14 @@ MOMENTUM_THRESHOLD = 0.05     # ...漲幅超過幾% 會標記 !
 MIN_TRADING_VALUE = 30000000  # 每日成交金額門檻 (預設3000萬)
 
 # 2. 權重分配 (總和建議 100)
-WEIGHT_GAIN = 10              # 當日/波段漲幅權重
-WEIGHT_VOLUME = 15            # 交易量突破權重 (量比)
-WEIGHT_FOREIGN = 30           # 外資挹注權重 (最高)
-WEIGHT_SITC = 15              # 投信挹注權重 (降低)
-WEIGHT_VCP = 20               # VCP 波動收斂權重 (新增)
+WEIGHT_GAIN = 50              # 當日/波段漲幅權重 (PureGain 實驗證明此區間最有效)
+WEIGHT_VOLUME = 10            # 交易量突破權重 (量比)
+WEIGHT_FOREIGN = 10           # 外資挹注權重
+WEIGHT_SITC = 10              # 投信挹注權重
+WEIGHT_VCP = 10               # VCP 波動收斂權重
 WEIGHT_BREAKOUT = 10          # 壓力線突破權重
 
-MIN_SCORE_TO_PRINT = 40       # 總分超過此值才印出 (因權重調整，提高門檻)
+MIN_SCORE_TO_PRINT = 60       # 提高門檻，只看最強勢標的
 
 # 3. 各項機制變數
 VOL_AVG_DAYS = 5
@@ -119,11 +119,11 @@ def check_institutional_consensus(inst_data, date):
     s_net = s.get('buy', 0) - s.get('sell', 0)
     
     if f_net > 0 and s_net > 0:
-        return "consensus", 1.2 # 加成係數
+        return "consensus", 1.5 # 同步買超加成提高到 1.5x
     if (f_net > 0 and s_net < 0) or (f_net < 0 and s_net > 0):
         # 如果對幹且金額大，標記衝突
         if abs(f_net) > 500000 and abs(s_net) > 500000:
-            return "conflict", 0.5 # 減半係數
+            return "conflict", 0.7 # 衝突減損稍微放寬 0.5 -> 0.7
     return "neutral", 1.0
 
 def load_stock_data_wrapper(filename='stock_data.json'):

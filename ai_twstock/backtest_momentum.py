@@ -40,7 +40,7 @@ def load_config():
             print(f"[WARN] 載入設定檔失敗: {e}")
     return {}
 
-DATA_FILE = 'stock_data_slim.json'
+DATA_FILE = 'stock_data.json'
 STOCKS_INFO_FILE = 'taiwan_stocks.csv'
 EXPORT_PATH = os.path.join('temp_data', 'backtest_transactions.json')
 EXCEL_EXPORT_PATH = os.path.join('temp_data', 'backtest_report.xlsx')
@@ -294,13 +294,22 @@ def run_backtest(override_config=None, silent=False):
 
         if is_daily or current_date in actual_buy_dates:
             if idx < 20: continue
+            
+            # 使用市場廣度作為過濾器 (Market Breadth Filter)
+            breadth = get_market_breadth(idx)
+            if breadth < 0.3: # 市場過於疲弱，不開新倉
+                if not silent: print(f"  [SKIPPED] {current_date} Market Breadth too low: {breadth:.1%}")
+                continue
+                
             start_date_buy = all_dates[idx - 20]
             results_buy = analyze_momentum.analyze_momentum(data, start_date_buy, current_date)
             valid_results = [r for r in results_buy if r['stock_id'] in data and current_date in data[r['stock_id']]['price'] and r['score'] >= buy_score_threshold]
             top_stocks = valid_results[:top_n]
             num_to_buy = len(top_stocks)
             if num_to_buy > 0:
-                target_allocations = calculate_allocations(num_to_buy, daily_invest_pool, min_last_pos_ratio)
+                # 根據市場廣度動態調整投資池
+                effective_pool = daily_invest_pool * (1.2 if breadth > 0.7 else (0.5 if breadth < 0.5 else 1.0))
+                target_allocations = calculate_allocations(num_to_buy, effective_pool, min_last_pos_ratio)
                 if date_key not in json_history: json_history[date_key] = []
                 for i, res in enumerate(top_stocks):
                     sid = res['stock_id']; price = res['close']; target_amount = target_allocations[i]
