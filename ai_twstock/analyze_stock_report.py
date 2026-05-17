@@ -17,18 +17,9 @@ if sys.platform == 'win32':
 plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei', 'SimHei', 'Arial', 'sans-serif']
 plt.rcParams['axes.unicode_minus'] = False
 
-def get_script_dir():
-    return os.path.dirname(os.path.abspath(__file__))
-
-def load_stock_data(stock_id):
-    path = os.path.join(get_script_dir(), 'data_independent', f"{stock_id}.json")
-    if os.path.exists(path):
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                return data.get(stock_id, {})
-        except Exception: pass
-    return {}
+# 將 lib 目錄加入 Python 路徑
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lib'))
+from common_lib import load_independent_stock_data, get_script_dir
 
 def format_number(n):
     if abs(n) >= 10**8: return f"{n/10**8:.1f}億"
@@ -94,7 +85,7 @@ def plot_analysis(stock_id, df, peaks, troughs, sh_summary):
     print(f"\n[圖表已更新生成] {out_file}")
 
 def analyze_stock(stock_id, start_date, end_date):
-    data = load_stock_data(stock_id)
+    data = load_independent_stock_data(stock_id, get_script_dir(__file__))
     if not data: return print("找不到資料")
 
     price_data, inst_data, hold_data = data.get('price', {}), data.get('institutional', {}), data.get('shareholding', {})

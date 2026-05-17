@@ -3,9 +3,13 @@
     "DAILY_INVEST_POOL": 300000,
     "TOP_N": 10,
     "BUY_DATES": [
+        "2025-10-10",
+        "2025-11-10",
+        "2025-12-10",
         "2026-02-10",
-        "2026-03-10",
         "2026-04-10"
     ],
-    "MIN_LAST_POS_RATIO": 0.20
+    "MIN_LAST_POS_RATIO": 0.20,
+    "TAKE_PROFIT_HALF_THRESHOLD": 0.25,
+    "MOMENTUM_EXIT_THRESHOLD": 30
 }

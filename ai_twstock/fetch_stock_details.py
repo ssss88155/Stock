@@ -9,14 +9,15 @@ import threading
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+# 將 lib 目錄加入 Python 路徑
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lib'))
+from common_lib import load_independent_stock_data, get_script_dir
+
 # Global event for handling Ctrl+C
 shutdown_event = threading.Event()
 # Lock for file operations on individual files (usually not needed if 1 thread per stock, but safe to keep)
 file_locks = {}
 locks_lock = threading.Lock()
-
-def get_script_dir():
-    return os.path.dirname(os.path.abspath(__file__))
 
 def get_stock_lock(stock_id):
     with locks_lock:
@@ -25,32 +26,20 @@ def get_stock_lock(stock_id):
         return file_locks[stock_id]
 
 def load_config():
-    config_path = os.path.join(get_script_dir(), 'config.json')
+    config_path = os.path.join(get_script_dir(__file__), 'config.json')
     with open(config_path, 'r') as f:
         return json.load(f)
 
-def load_stock_data(stock_id):
-    """Load data for a single stock from independent file."""
-    path = os.path.join(get_script_dir(), 'data_independent', f"{stock_id}.json")
-    if os.path.exists(path):
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                return data.get(stock_id, {})
-        except (json.JSONDecodeError, Exception):
-            return {}
-    return {}
-
 def save_stock_data(stock_id, data):
     """Save data for a single stock to independent file."""
-    target_dir = os.path.join(get_script_dir(), 'data_independent')
+    target_dir = os.path.join(get_script_dir(__file__), 'data_independent')
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
         
     path = os.path.join(target_dir, f"{stock_id}.json")
     
     with get_stock_lock(stock_id):
-        existing_data = load_stock_data(stock_id)
+        existing_data = load_independent_stock_data(stock_id, get_script_dir(__file__))
         
         if existing_data:
             # Merge logic
@@ -145,7 +134,7 @@ def process_single_stock(api, stock_id, start_date, end_date, target_dates, slee
     if shutdown_event.is_set(): return None
     
     # Load only this stock's data
-    data = load_stock_data(stock_id)
+    data = load_independent_stock_data(stock_id, get_script_dir(__file__))
     
     # Check if we already have the latest data
     has_data = last_target_date in data.get('price', {})
@@ -179,7 +168,7 @@ def process_single_stock(api, stock_id, start_date, end_date, target_dates, slee
         if fetched_data:
             save_stock_data(stock_id, fetched_data)
             # Reload to get merged data
-            data = load_stock_data(stock_id)
+            data = load_independent_stock_data(stock_id, get_script_dir(__file__))
             
             elapsed = time.time() - fetch_start_time
             remaining_sleep = sleep_time - elapsed
@@ -203,7 +192,7 @@ def process_single_stock(api, stock_id, start_date, end_date, target_dates, slee
     return None
 
 def get_sorted_stock_list(stocks_path):
-    order_path = os.path.join(get_script_dir(), 'fetch_order.json')
+    order_path = os.path.join(get_script_dir(__file__), 'fetch_order.json')
     if os.path.exists(order_path):
         with open(order_path, 'r') as f:
             return json.load(f)
@@ -215,7 +204,7 @@ def get_sorted_stock_list(stocks_path):
     
     for sid in stock_ids:
         vol = 0
-        data = load_stock_data(sid)
+        data = load_independent_stock_data(sid, get_script_dir(__file__))
         if 'price' in data:
             price_entries = data['price']
             if price_entries:
@@ -254,7 +243,7 @@ def main():
         LOOKBACK_DAYS = 2
         GAIN_THRESHOLD = 0.05
         
-        stocks_path = os.path.join(get_script_dir(), 'taiwan_stocks.csv')
+        stocks_path = os.path.join(get_script_dir(__file__), 'taiwan_stocks.csv')
         
         if args.stock_id:
             test_stocks = [args.stock_id]

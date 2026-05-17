@@ -5,11 +5,16 @@ import keyring
 import argparse
 import calendar
 import pickle
+import sys
 from datetime import datetime, timedelta
 from collections import OrderedDict
 from configparser import ConfigParser
 from esun_trade.sdk import SDK
 from esun_marketdata.util import TRADE_SDK_ACCOUNT_KEY, TRADE_SDK_CERT_KEY, setup_keyring
+
+# 將 lib 目錄加入 Python 路徑
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lib'))
+from common_lib import Color, pad_string, get_display_width
 
 # --- 配置區 ---
 CONFIG_PATH = './config.ini'
@@ -18,11 +23,6 @@ DOC_DIR = 'doc'
 JSON_PATH = os.path.join(DOC_DIR, 'transactions.json')
 INV_CACHE = os.path.join(DOC_DIR, 'inv_cache.p')
 LOCAL_DATA_DIR = r'C:\jupyter_notebook\ai_twstock\data_independent'
-
-# ANSI 顏色
-YELLOW = "\033[93m"
-GRAY = "\033[37m"
-RESET = "\033[0m"
 
 def force_float(val):
     if val is None or val == "": return 0.0
@@ -33,27 +33,6 @@ def g(obj, k):
     val = getattr(obj, k, None)
     if val is None and isinstance(obj, dict): val = obj.get(k)
     return val
-
-def get_display_width(s):
-    import unicodedata
-    width = 0
-    for char in str(s):
-        if unicodedata.east_asian_width(char) in ('W', 'F', 'A'): width += 2
-        else: width += 1
-    return width
-
-def pad_to_width(s, width, align='left'):
-    s = str(s)
-    current_width = get_display_width(s)
-    pad_size = max(0, width - current_width)
-    if align == 'left':
-        return s + ' ' * pad_size
-    elif align == 'right':
-        return ' ' * pad_size + s
-    else: # center
-        left_pad = pad_size // 2
-        right_pad = pad_size - left_pad
-        return ' ' * left_pad + s + ' ' * right_pad
 
 def parse_date(d_str):
     for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y%m%d"):
@@ -146,24 +125,65 @@ def get_stats_for_date(history, inv_map, target_end_date):
     return df, total_cash_p + total_unrealized, peak_cap
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('mode', type=int, nargs='?', default=0)
+    help_text = (
+        "玉山證券投資績效報告工具\n"
+        "參數用途說明：\n"
+        "  [0]    : (預設) 讀取本地快取資料，不連接 SDK (最快)\n"
+        "  [-1]   : 【唯一同步模式】連接 SDK 更新最新庫存與成交紀錄\n"
+        "  [1-12] : 分析指定月份 (不更新資料，如需更新請先執行 -1)\n"
+    )
+    
+    parser = argparse.ArgumentParser(description='玉山證券投資績效報告工具', formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument('mode', type=int, nargs='?', default=0, help='執行模式')
     args = parser.parse_args()
+
+    # 執行時印出參數功能
+    print("-" * 60)
+    print(help_text)
+    print("-" * 60)
 
     today = datetime.now()
     try:
         if not os.path.exists(DOC_DIR): os.makedirs(DOC_DIR)
-        if args.mode != 0:
+        
+        # 修改邏輯：只有 -1 模式才去爬即時資料
+        if args.mode == -1:
             try:
+                print(f"[INFO] 正在連接玉山 SDK 同步即時資料...")
                 sdk = login_sdk()
+                
+                # 1. 更新庫存
                 inv_raw = sdk.get_inventories()
-                with open(INV_CACHE, 'wb') as f: pickle.dump(inv_raw, f)
-                s_sync = (today - timedelta(days=365)).strftime("%Y-%m-%d") if args.mode == -1 else f"{today.year}-{args.mode:02d}-01"
-                res = sdk.get_transactions_by_date(s_sync, today.strftime("%Y-%m-%d"))
-                if res: update_json_history(res)
-            except Exception: pass
+                with open(INV_CACHE, 'wb') as f: 
+                    pickle.dump(inv_raw, f)
+                
+                # 2. 更新成交紀錄 (同步過去 90 天)
+                s_sync = (today - timedelta(days=90)).strftime("%Y-%m-%d")
+                e_sync = today.strftime("%Y-%m-%d")
+                
+                try:
+                    res = sdk.get_transactions_by_date(s_sync, e_sync)
+                except ValueError as ve:
+                    if "AW00002" in str(ve):
+                        print("[INFO] 偵測到日期範圍限制，自動縮短至 30 天...")
+                        s_sync = (today - timedelta(days=30)).strftime("%Y-%m-%d")
+                        res = sdk.get_transactions_by_date(s_sync, e_sync)
+                    else: raise ve
+                    
+                if res: 
+                    update_json_history(res)
+                    print(f"[SUCCESS] 資料更新成功，同步 {len(res)} 筆紀錄。")
+                else:
+                    print(f"[INFO] SDK 同步完成，但無新成交紀錄。")
+                    update_json_history([])
+            except Exception as e:
+                print(f"[ERROR] SDK 更新失敗: {e}")
+                if os.path.exists(JSON_PATH): update_json_history([])
         else:
-            if os.path.exists(JSON_PATH): update_json_history([])
+            # 模式 0 或 1-12：直接從快取載入，不進行 SDK 連線
+            print(f"[INFO] 執行模式 {args.mode}：使用本地快取資料。")
+            if os.path.exists(JSON_PATH): 
+                update_json_history([])
 
         inv_map = {}
         if os.path.exists(INV_CACHE):
@@ -197,15 +217,14 @@ def main():
         print("\n" + "="*55 + "\n  各月份投資績效變動表\n" + "="*55)
         m_headers = ["月份", "總盈虧差額", "總投入金額", "比例 (%)"]
         m_widths = [11, 14, 14, 12]
-        # 標題置中
-        print("".join(pad_to_width(h, w, 'center') for h, w in zip(m_headers, m_widths)))
+        print("".join(pad_string(h, w, 'center') for h, w in zip(m_headers, m_widths)))
         print("-" * 55)
         for r in monthly_report:
-            line = pad_to_width(r["月份"], m_widths[0], 'left')
-            line += pad_to_width(f"{r['差額']:,.0f}", m_widths[1], 'right')
-            line += pad_to_width(f"{r['總投入']:,.0f}", m_widths[2], 'right')
-            line += pad_to_width(f"{r['比例']:.2f}%", m_widths[3], 'right')
-            if '*' in r["月份"]: print(f"{YELLOW}{line}{RESET}")
+            line = pad_string(r["月份"], m_widths[0], 'left')
+            line += pad_string(f"{r['差額']:,.0f}", m_widths[1], 'right')
+            line += pad_string(f"{r['總投入']:,.0f}", m_widths[2], 'right')
+            line += pad_string(f"{r['比例']:.2f}%", m_widths[3], 'right')
+            if '*' in r["月份"]: print(Color.wrap(line, Color.YELLOW))
             else: print(line)
         print("-" * 55)
 
@@ -233,22 +252,22 @@ def main():
             print("\n" + "="*110 + f"\n  投資績效明細表 (至 {rep_end.strftime('%Y-%m-%d')})\n" + "="*110)
             h_cols = ["編號", "公司", "購買金額", "賣出金額", "現金盈虧", "尚餘股數", "均價", "現價", "總盈虧"]
             h_wids = [8, 14, 12, 12, 12, 10, 10, 10, 12]
-            # 標題置中
-            print("".join(pad_to_width(h, w, 'center') for h, w in zip(h_cols, h_wids)))
+            print("".join(pad_string(h, w, 'center') for h, w in zip(h_cols, h_wids)))
             print("-" * 110)
             for r in rows:
-                line = pad_to_width(r["編號"], h_wids[0], 'left')
-                line += pad_to_width(r["公司"], h_wids[1], 'left')
-                line += pad_to_width(f"{r['購買金額']:,.0f}", h_wids[2], 'right')
-                line += pad_to_width(f"{r['賣出金額']:,.0f}", h_wids[3], 'right')
-                line += pad_to_width(f"{r['現金盈虧']:,.0f}", h_wids[4], 'right')
-                line += pad_to_width(f"{r['尚餘股數']:,.1f}", h_wids[5], 'right')
-                line += pad_to_width(f"{r['均價']:.2f}", h_wids[6], 'right')
-                line += pad_to_width(f"{r['現價']:.2f}", h_wids[7], 'right')
-                line += pad_to_width(f"{r['總盈虧']:,.0f}", h_wids[8], 'right')
+                line = pad_string(r["編號"], h_wids[0], 'left')
+                line += pad_string(r["公司"], h_wids[1], 'left')
+                line += pad_string(f"{r['購買金額']:,.0f}", h_wids[2], 'right')
+                line += pad_string(f"{r['賣出金額']:,.0f}", h_wids[3], 'right')
+                line += pad_string(f"{r['現金盈虧']:,.0f}", h_wids[4], 'right')
+                line += pad_string(f"{r['尚餘股數']:,.1f}", h_wids[5], 'right')
+                line += pad_string(f"{r['均價']:.2f}", h_wids[6], 'right')
+                line += pad_string(f"{r['現價']:.2f}", h_wids[7], 'right')
+                line += pad_string(f"{r['總盈虧']:,.0f}", h_wids[8], 'right')
                 
-                if r["尚餘股數"] == 0 and r["編號"] not in traded_this_month:
-                    print(f"{GRAY}{line}{RESET}")
+                # 灰色顯示邏輯：若庫存股數為 0，代表已結清，顯示為灰色
+                if r["尚餘股數"] <= 0:
+                    print(Color.wrap(line, Color.GRAY))
                 else:
                     print(line)
             print("-" * 110)
