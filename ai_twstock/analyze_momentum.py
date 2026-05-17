@@ -48,7 +48,15 @@ RESISTANCE_LOOKBACK = 180       # 找過去 N 天最高點作為壓力線
 def get_script_dir():
     return os.path.dirname(os.path.abspath(__file__))
 
+# --- 全域快取 ---
+_SORTED_DATES_CACHE = {}
+_LOADED_DATA_CACHE = None
+
 def load_data(filename='stock_data.json'):
+    global _LOADED_DATA_CACHE
+    if _LOADED_DATA_CACHE is not None:
+        return _LOADED_DATA_CACHE
+        
     # 自動執行增量合併
     sync_independent_data(filename)
     
@@ -60,6 +68,7 @@ def load_data(filename='stock_data.json'):
             try:
                 data = json.load(f)
                 print(f"[DEBUG] JSON loaded successfully. Type: {type(data)}")
+                _LOADED_DATA_CACHE = data
                 return data
             except json.JSONDecodeError as e:
                 print(f"[DEBUG] JSON Decode Error: {e}")
@@ -246,19 +255,24 @@ def analyze_momentum(data, start_date, end_date):
             filtered_counts['missing_dates'] += 1
             continue
             
-        end_close = price_data[end_date]['close']
         start_close = price_data[start_date]['close']
-        
         if not start_close:
             filtered_counts['missing_dates'] += 1
             continue
             
+        end_close = price_data[end_date]['close']
         gain = (end_close - start_close) / start_close
         if gain < MIN_GAIN_REQUIRED:
             filtered_counts['low_gain'] += 1
             continue
             
-        sorted_dates = sorted(price_data.keys())
+        # 使用快取避免重複排序
+        if stock_id in _SORTED_DATES_CACHE:
+            sorted_dates = _SORTED_DATES_CACHE[stock_id]
+        else:
+            sorted_dates = sorted(price_data.keys())
+            _SORTED_DATES_CACHE[stock_id] = sorted_dates
+            
         idx = sorted_dates.index(end_date)
         
         price_streak = check_price_streak(price_data, sorted_dates, idx)

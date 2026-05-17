@@ -21,7 +21,7 @@ LOCAL_DATA_DIR = r'C:\jupyter_notebook\ai_twstock\data_independent'
 
 # ANSI 顏色
 YELLOW = "\033[93m"
-GRAY = "\033[2m"
+GRAY = "\033[37m"
 RESET = "\033[0m"
 
 def force_float(val):
@@ -46,8 +46,14 @@ def pad_to_width(s, width, align='left'):
     s = str(s)
     current_width = get_display_width(s)
     pad_size = max(0, width - current_width)
-    if align == 'left': return s + ' ' * pad_size
-    else: return ' ' * pad_size + s
+    if align == 'left':
+        return s + ' ' * pad_size
+    elif align == 'right':
+        return ' ' * pad_size + s
+    else: # center
+        left_pad = pad_size // 2
+        right_pad = pad_size - left_pad
+        return ' ' * left_pad + s + ' ' * right_pad
 
 def parse_date(d_str):
     for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y%m%d"):
@@ -147,15 +153,11 @@ def main():
     today = datetime.now()
     try:
         if not os.path.exists(DOC_DIR): os.makedirs(DOC_DIR)
-        
-        # 1. SDK 同步
         if args.mode != 0:
             try:
                 sdk = login_sdk()
                 inv_raw = sdk.get_inventories()
-                with open(INV_CACHE, 'wb') as f:
-                    pickle.dump(inv_raw, f)
-                
+                with open(INV_CACHE, 'wb') as f: pickle.dump(inv_raw, f)
                 s_sync = (today - timedelta(days=365)).strftime("%Y-%m-%d") if args.mode == -1 else f"{today.year}-{args.mode:02d}-01"
                 res = sdk.get_transactions_by_date(s_sync, today.strftime("%Y-%m-%d"))
                 if res: update_json_history(res)
@@ -175,52 +177,10 @@ def main():
         if not os.path.exists(JSON_PATH): return
         with open(JSON_PATH, 'r', encoding='utf-8') as f: history = json.load(f)
 
-        # --- 3. 詳細對帳表 ---
         target_month = args.mode if 1 <= args.mode <= 12 else today.month
         
-        # 找出本月有交易的股票 ID
-        this_month_start = datetime(today.year, target_month, 1)
-        this_month_end = datetime(today.year, target_month, calendar.monthrange(today.year, target_month)[1])
-        traded_this_month = set()
-        for d_str, tasks in history.items():
-            dt = parse_date(d_str)
-            if dt and this_month_start <= dt <= this_month_end:
-                for t in tasks: traded_this_month.add(t['stk_no'])
-
+        # --- 1. 月份變動表 ---
         months_to_show = list(range(2, target_month + 1))
-        rep_end = datetime(today.year, target_month, calendar.monthrange(today.year, target_month)[1])
-        df_p, current_total_pl, current_peak = get_stats_for_date(history, inv_map, rep_end)
-        if df_p is not None:
-            rows = []
-            for s_no, gp in df_p.groupby('stk_no'):
-                inv = inv_map.get(s_no, {"尚餘股數": 0, "均價": 0, "SDK現價": 0})
-                lp = get_local_price(s_no, rep_end if rep_end < today else today); fp = lp if lp is not None else inv["SDK現價"]
-                cash_p = gp['profit'].sum(); unrealized = (fp - inv["均價"]) * inv["尚餘股數"] if inv["尚餘股數"] > 0 else 0
-                rows.append({"編號": s_no, "公司": gp['stk_na'].iloc[-1], "購買金額": gp[gp['side']=='B']['amount'].sum(), "賣出金額": gp[gp['side']=='S']['amount'].sum(), "現金盈虧": cash_p, "尚餘股數": inv["尚餘股數"], "均價": inv["均價"], "現價": fp, "總盈虧": cash_p + unrealized})
-            # 排序：有股數的在前，0股數的在後
-            rows.sort(key=lambda x: x["尚餘股數"] == 0)
-            
-            print("\n" + "="*110 + f"\n  投資績效明細表 (至 {rep_end.strftime('%Y-%m-%d')})\n" + "="*110)
-            h_cols = ["編號", "公司", "購買金額", "賣出金額", "現金盈虧", "尚餘股數", "均價", "現價", "總盈虧"]
-            h_wids = [8, 14, 12, 12, 12, 10, 10, 10, 12]
-            print("".join(pad_to_width(h, w) for h, w in zip(h_cols, h_wids)))
-            print("-" * 110)
-            for r in rows:
-                line_content = "".join(pad_to_width(r[k] if isinstance(r[k], str) else f"{r[k]:,.0f}" if '金額' in k or '盈虧' in k else f"{r[k]:.2f}" if '價' in k else f"{r[k]}", w) for k, w in zip(h_cols, h_wids))
-                # 只有當 (尚餘股數為 0) 且 (本月完全沒交易) 時才灰掉
-                if r["尚餘股數"] == 0 and r["編號"] not in traded_this_month:
-                    print(f"{GRAY}{line_content}{RESET}")
-                else:
-                    print(line_content)
-            print("-" * 110)
-            s_cash = sum(r['現金盈虧'] for r in rows)
-            print(f"該時段投入金額 (最高成本): {current_peak:,.0f} 元")
-            print(f"累計現金盈虧 (已實現): {s_cash:,.0f} 元 ({(s_cash/current_peak*100):.2f}%)")
-            print(f"最終預估盈虧 (含持股): {current_total_pl:,.0f} 元 ({(current_total_pl/current_peak*100):.2f}%)")
-            print("-" * 43 + "\n")
-
-
-        # --- 2. 月份變動表 ---
         monthly_report = []
         prev_total_pl = 0
         for m in range(1, target_month + 1):
@@ -234,22 +194,71 @@ def main():
                 monthly_report.append({"月份": m_label, "總投入": peak, "差額": diff, "比例": diff_pct})
             prev_total_pl = total_pl
 
+        print("\n" + "="*55 + "\n  各月份投資績效變動表\n" + "="*55)
         m_headers = ["月份", "總盈虧差額", "總投入金額", "比例 (%)"]
-        m_widths = [9, 12, 12, 10]
-        print("".join(pad_to_width(h, w) for h, w in zip(m_headers, m_widths)))
-        print("-" * 50)
+        m_widths = [11, 14, 14, 12]
+        # 標題置中
+        print("".join(pad_to_width(h, w, 'center') for h, w in zip(m_headers, m_widths)))
+        print("-" * 55)
         for r in monthly_report:
-            line = pad_to_width(r["月份"], m_widths[0]) 
-            line += pad_to_width(f"{r['差額']:,.0f}", m_widths[1]) 
-            line += pad_to_width(f"{r['總投入']:,.0f}", m_widths[2]) 
-            line += pad_to_width(f"{r['比例']:.2f}%", m_widths[3])
+            line = pad_to_width(r["月份"], m_widths[0], 'left')
+            line += pad_to_width(f"{r['差額']:,.0f}", m_widths[1], 'right')
+            line += pad_to_width(f"{r['總投入']:,.0f}", m_widths[2], 'right')
+            line += pad_to_width(f"{r['比例']:.2f}%", m_widths[3], 'right')
             if '*' in r["月份"]: print(f"{YELLOW}{line}{RESET}")
             else: print(line)
-        print("-" * 50)
+        print("-" * 55)
 
+        # --- 2. 詳細對帳表 ---
+        rep_end = datetime(today.year, target_month, calendar.monthrange(today.year, target_month)[1])
+        df_p, current_total_pl, current_peak = get_stats_for_date(history, inv_map, rep_end)
+        
+        this_month_start = datetime(today.year, target_month, 1)
+        this_month_end = datetime(today.year, target_month, calendar.monthrange(today.year, target_month)[1])
+        traded_this_month = set()
+        for d_str, tasks in history.items():
+            dt = parse_date(d_str)
+            if dt and this_month_start <= dt <= this_month_end:
+                for t in tasks: traded_this_month.add(t['stk_no'])
+
+        if df_p is not None:
+            rows = []
+            for s_no, gp in df_p.groupby('stk_no'):
+                inv = inv_map.get(s_no, {"尚餘股數": 0, "均價": 0, "SDK現價": 0})
+                lp = get_local_price(s_no, rep_end if rep_end < today else today); fp = lp if lp is not None else inv["SDK現價"]
+                cash_p = gp['profit'].sum(); unrealized = (fp - inv["均價"]) * inv["尚餘股數"] if inv["尚餘股數"] > 0 else 0
+                rows.append({"編號": s_no, "公司": gp['stk_na'].iloc[-1], "購買金額": gp[gp['side']=='B']['amount'].sum(), "賣出金額": gp[gp['side']=='S']['amount'].sum(), "現金盈虧": cash_p, "尚餘股數": inv["尚餘股數"], "均價": inv["均價"], "現價": fp, "總盈虧": cash_p + unrealized})
+            
+            rows.sort(key=lambda x: x["尚餘股數"] == 0)
+            print("\n" + "="*110 + f"\n  投資績效明細表 (至 {rep_end.strftime('%Y-%m-%d')})\n" + "="*110)
+            h_cols = ["編號", "公司", "購買金額", "賣出金額", "現金盈虧", "尚餘股數", "均價", "現價", "總盈虧"]
+            h_wids = [8, 14, 12, 12, 12, 10, 10, 10, 12]
+            # 標題置中
+            print("".join(pad_to_width(h, w, 'center') for h, w in zip(h_cols, h_wids)))
+            print("-" * 110)
+            for r in rows:
+                line = pad_to_width(r["編號"], h_wids[0], 'left')
+                line += pad_to_width(r["公司"], h_wids[1], 'left')
+                line += pad_to_width(f"{r['購買金額']:,.0f}", h_wids[2], 'right')
+                line += pad_to_width(f"{r['賣出金額']:,.0f}", h_wids[3], 'right')
+                line += pad_to_width(f"{r['現金盈虧']:,.0f}", h_wids[4], 'right')
+                line += pad_to_width(f"{r['尚餘股數']:,.1f}", h_wids[5], 'right')
+                line += pad_to_width(f"{r['均價']:.2f}", h_wids[6], 'right')
+                line += pad_to_width(f"{r['現價']:.2f}", h_wids[7], 'right')
+                line += pad_to_width(f"{r['總盈虧']:,.0f}", h_wids[8], 'right')
+                
+                if r["尚餘股數"] == 0 and r["編號"] not in traded_this_month:
+                    print(f"{GRAY}{line}{RESET}")
+                else:
+                    print(line)
+            print("-" * 110)
+            s_cash = sum(r['現金盈虧'] for r in rows)
+            print(f"該時段投入金額 (最高成本): {current_peak:,.0f} 元")
+            print(f"累計現金盈虧 (已實現): {s_cash:,.0f} 元 ({(s_cash/current_peak*100):.2f}%)")
+            print(f"最終預估盈虧 (含持股): {current_total_pl:,.0f} 元 ({(current_total_pl/current_peak*100):.2f}%)")
+            print("-" * 110 + "\n")
     except Exception:
         import traceback; traceback.print_exc()
 
 if __name__ == "__main__":
     main()
-
