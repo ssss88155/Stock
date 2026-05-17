@@ -209,6 +209,19 @@ def run_backtest(override_config=None, silent=False):
     # 3. 模擬交易
     weights = _config.get('WEIGHTS', None)
     is_daily = (buy_dates_config == "DAILY")
+    
+    # 計算市場廣度 (Market Breadth) 作為濾網
+    def get_market_breadth(date_idx):
+        if date_idx < 10: return 1.0
+        target_date = all_dates[date_idx]
+        above_ma = 0; total = 0
+        for sid in data:
+            prices = [data[sid]['price'][d]['close'] for d in all_dates[date_idx-10:date_idx+1] if d in data[sid]['price']]
+            if len(prices) < 10: continue
+            ma10 = sum(prices[:-1]) / 10
+            if prices[-1] > ma10: above_ma += 1
+            total += 1
+        return above_ma / total if total > 0 else 1.0
     actual_buy_dates = {}
     if not is_daily:
         for bd in buy_dates_config:

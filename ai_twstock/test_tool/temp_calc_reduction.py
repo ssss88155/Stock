@@ -3,7 +3,7 @@ import os
 
 VOL_LEVELS = [100000, 500000, 1500000, 5000000]
 
-def calculate_actual_reduction(input_file='stock_data_slim.json'):
+def calculate_actual_reduction(input_file='stock_data.json'):
     path = os.path.join('C:/jupyter_notebook/ai_twstock/', input_file)
     with open(path, 'r', encoding='utf-8') as f:
         data = json.load(f)

@@ -228,71 +228,65 @@ def analyze_momentum(data, start_date, end_date, weights=None):
     results = []
     industry_map = load_industry_data()
     
-    # 決定分數顯示門檻 (如果權重變大，可能要調整)
     min_score = weights.get('MIN_SCORE_TO_PRINT', MIN_SCORE_TO_PRINT) if weights else MIN_SCORE_TO_PRINT
 
+    # 第一輪：計算原始分數
     for stock_id, details in data.items():
         price_data = details.get('price', {})
         inst_data = details.get('institutional', {})
-        
-        if start_date not in price_data or end_date not in price_data:
-            continue
-            
-        # 0. 流動性濾網 (成交金額 = 股價 * 成交量)
+        if start_date not in price_data or end_date not in price_data: continue
         current_price = price_data[end_date]['close']
         current_vol = price_data[end_date].get('Trading_Volume', 0)
         trading_value = current_price * current_vol
-        if trading_value < MIN_TRADING_VALUE:
-            continue
-
+        if trading_value < MIN_TRADING_VALUE: continue
         start_close = price_data[start_date]['close']
         if not start_close: continue
         gain = (current_price - start_close) / start_close
         if gain < MIN_GAIN_REQUIRED: continue
-            
-        if stock_id in _SORTED_DATES_CACHE:
-            sorted_dates = _SORTED_DATES_CACHE[stock_id]
+        if stock_id in _SORTED_DATES_CACHE: sorted_dates = _SORTED_DATES_CACHE[stock_id]
         else:
             sorted_dates = sorted(price_data.keys())
             _SORTED_DATES_CACHE[stock_id] = sorted_dates
-            
         idx = sorted_dates.index(end_date)
-        
-        # 核心技術與籌碼檢查
         vol_ok, vol_ratio = check_volume_breakthrough(price_data, sorted_dates, idx)
         sitc_ok, sitc_ratio = check_sitc_momentum(inst_data, sorted_dates, idx)
         foreign_ok, foreign_days = check_foreign_streak(inst_data, sorted_dates, idx)
         vcp_ok, vcp_score = check_vcp_pattern(price_data, sorted_dates, idx)
         breakout_ok, res_level = check_resistance_breakout(price_data, sorted_dates, idx)
-        
-        # 法人共識/衝突檢查
         inst_status, inst_multiplier = check_institutional_consensus(inst_data, end_date)
         
         res = {
-            'stock_id': stock_id, 
-            'name': details.get('name', ''),
+            'stock_id': stock_id, 'name': details.get('name', ''),
             'industry': industry_map.get(stock_id, '其他'),
-            'close': current_price, 
-            'gain': gain, 
-            'vol_ratio': vol_ratio,
-            'sitc_ratio': sitc_ratio, 
-            'foreign_days': foreign_days,
-            'vcp_ok': vcp_ok,
-            'vcp_score': vcp_score,
-            'breakout_ok': breakout_ok,
-            'inst_multiplier': inst_multiplier,
-            'inst_status': inst_status,
-            'raw_volume': current_vol,
-            'trading_value': trading_value,
-            'resistance': res_level
+            'close': current_price, 'gain': gain, 'vol_ratio': vol_ratio,
+            'sitc_ratio': sitc_ratio, 'foreign_days': foreign_days,
+            'vcp_ok': vcp_ok, 'vcp_score': vcp_score, 'breakout_ok': breakout_ok,
+            'inst_multiplier': inst_multiplier, 'inst_status': inst_status,
+            'raw_volume': current_vol, 'trading_value': trading_value, 'resistance': res_level
         }
         res['score'] = calculate_score(res, weights=weights)
-        
-        if res['score'] >= min_score:
-            results.append(res)
-                
-    results.sort(key=lambda x: (x['score'], x['gain']), reverse=True)
-    return results
+        results.append(res)
+    
+    # 第二輪：產業集群加成 (Sector Momentum Bonus)
+    industry_scores = {}
+    for res in results:
+        ind = res['industry']
+        if res['score'] >= 60: # 門檻
+            industry_scores[ind] = industry_scores.get(ind, 0) + 1
+            
+    # 對於在強勢產業中的標的給予 1.1x ~ 1.2x 的加成
+    for res in results:
+        ind_count = industry_scores.get(res['industry'], 0)
+        if ind_count >= 3:
+            res['score'] *= 1.15
+            res['industry_bonus'] = True
+        else:
+            res['industry_bonus'] = False
+
+    # 第三輪：過濾與排序
+    final_results = [r for r in results if r['score'] >= min_score]
+    final_results.sort(key=lambda x: (x['score'], x['gain']), reverse=True)
+    return final_results
 
 def main():
     parser = argparse.ArgumentParser(description='Analyze Taiwan stock momentum.')

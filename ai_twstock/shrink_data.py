@@ -2,7 +2,7 @@ import json
 import os
 import sys
 
-def shrink_data(input_file='stock_data_tmp.json', output_file='stock_data_slim.json'):
+def shrink_data(input_file='stock_data.json', output_file='stock_data_slim.json'):
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), input_file)
     if not os.path.exists(path):
         print(f"Error: {input_file} not found.")
