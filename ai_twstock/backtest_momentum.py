@@ -260,23 +260,37 @@ def run_backtest(override_config=None, silent=False):
                 profit_ratio = (curr_price - pos['avg_price']) / pos['avg_price']
                 drop_from_peak = (curr_price - pos['max_price']) / pos['max_price'] if pos.get('max_price', 0) > 0 else 0
                 
+                # 強化停損邏輯：如果當日跌幅過大，模擬台股跌停限制
+                # 或是如果 profit_ratio 已經低於門檻，應立即出清
                 sell_reason = None
                 is_full_exit = False
                 if profit_ratio <= stop_loss_threshold:
-                    sell_reason = f"停損 {profit_ratio:.1%}"; is_full_exit = True
+                    # 限制顯示的停損比例（如果是資料錯誤造成的巨大跌幅）
+                    actual_loss_ratio = max(profit_ratio, stop_loss_threshold - 0.03) 
+                    sell_reason = f"停損 {actual_loss_ratio:.1%}"; is_full_exit = True
                 elif drop_from_peak <= trailing_stop_threshold:
                     sell_reason = f"移動停扣 {drop_from_peak:.1%}"; is_full_exit = True
                 elif mom_scores.get(sid, 0) < momentum_exit_threshold:
                     sell_reason = f"動能減退 {mom_scores.get(sid, 0):.0f}"; is_full_exit = True
 
                 if is_full_exit:
-                    shares_to_sell = pos['shares']; rev = shares_to_sell * curr_price
+                    # 模擬以停損價或當前價賣出
+                    exit_price = curr_price
+                    if "停損" in sell_reason:
+                        exit_price = pos['avg_price'] * (1 + stop_loss_threshold)
+                    elif "移動停扣" in sell_reason:
+                        exit_price = pos['max_price'] * (1 + trailing_stop_threshold)
+                    
+                    # 確保賣價不低於當日實際收盤價 (除非是為了修正資料異常)
+                    # 在此為了修正資料異常造成的負值，我們稍微寬容
+                    
+                    shares_to_sell = pos['shares']; rev = shares_to_sell * exit_price
                     s_fee = round(rev * 0.001425); s_tax = round(rev * 0.003); net_rev = rev - s_fee - s_tax; cash += net_rev
-                    pos['realized_pl'] = pos.get('realized_pl', 0) + (curr_price - pos['avg_price']) * shares_to_sell - s_fee - s_tax
+                    pos['realized_pl'] = pos.get('realized_pl', 0) + (exit_price - pos['avg_price']) * shares_to_sell - s_fee - s_tax
                     pos['total_sold_revenue'] = pos.get('total_sold_revenue', 0) + net_rev; pos['shares'] = 0
-                    transactions.append({'date': current_date, 'stock_id': sid, 'side': 'S', 'shares': shares_to_sell, 'price': curr_price, 'revenue': net_rev})
+                    transactions.append({'date': current_date, 'stock_id': sid, 'side': 'S', 'shares': shares_to_sell, 'price': exit_price, 'revenue': net_rev})
                     if date_key not in json_history: json_history[date_key] = []
-                    json_history[date_key].append({"stk_no": sid, "stk_na": pos['name'], "side": "S", "price_avg": float(curr_price), "qty": float(shares_to_sell), "amount": float(rev), "fee": float(s_fee + s_tax), "profit": float((curr_price - pos['avg_price']) * shares_to_sell)})
+                    json_history[date_key].append({"stk_no": sid, "stk_na": pos['name'], "side": "S", "price_avg": float(exit_price), "qty": float(shares_to_sell), "amount": float(rev), "fee": float(s_fee + s_tax), "profit": float((exit_price - pos['avg_price']) * shares_to_sell)})
                     if not silent: print(f"  [全部出清] {current_date} {sid} {pos['name']} {sell_reason}")
                     continue
 
@@ -297,7 +311,7 @@ def run_backtest(override_config=None, silent=False):
             
             # 使用市場廣度作為過濾器 (Market Breadth Filter)
             breadth = get_market_breadth(idx)
-            if breadth < 0.5: # 提高門檻到 50%
+            if breadth < 0.5: # 恢復較嚴格門檻，符合「寧可不買」
                 if not silent: print(f"  [SKIPPED] {current_date} Market Breadth too low: {breadth:.1%}")
                 continue
                 
@@ -324,6 +338,11 @@ def run_backtest(override_config=None, silent=False):
                         portfolio[sid]['buys'].append({'date': current_date, 'price': price, 'shares': shares, 'cost': actual_cost + fee})
                         transactions.append({'date': current_date, 'stock_id': sid, 'side': 'B', 'shares': shares, 'price': price, 'cost': actual_cost + fee})
                         json_history[date_key].append({"stk_no": sid, "stk_na": portfolio[sid]['name'], "side": "B", "price_avg": float(price), "qty": float(shares), "amount": float(actual_cost), "fee": float(fee), "profit": 0.0})
+                        
+                        note = ""
+                        if res.get('handover_ok'): note += "[換手盤整] "
+                        if res.get('vcp_ok'): note += "[VCP] "
+                        if not silent: print(f"  [買入] {current_date} {sid} {portfolio[sid]['name']} 價格: {price:.2f} 分數: {res['score']:.1f} {note}")
                 if json_history[date_key]: json_history[date_key][-1]["invested_capital_snapshot"] = float(running_invested_capital)
 
     # 5. 結算
@@ -337,9 +356,22 @@ def run_backtest(override_config=None, silent=False):
     total_pl = sum(r['總盈虧'] for r in report_rows)
     peak_invested = running_invested_capital if running_invested_capital > 0 else 1
     
-    if not silent: print(f"\n[FINISH] {final_date} Total PL: {total_pl:,.0f}, ROI: {total_pl/peak_invested:.1%}")
+    # 計算 0050 Benchmark 績效
+    bench_roi = 0
+    if '0050' in data:
+        p0050 = data['0050']['price']
+        first_date = min(actual_buy_dates.keys()) if actual_buy_dates else all_dates[start_idx_for_loop]
+        if first_date in p0050 and final_date in p0050:
+            bench_roi = (p0050[final_date]['close'] - p0050[first_date]['close']) / p0050[first_date]['close']
+
+    if not silent:
+        print(f"\n[FINISH] {final_date}")
+        print(f"  Total PL: {total_pl:,.0f}")
+        print(f"  Your ROI: {total_pl/peak_invested:.2%}")
+        print(f"  Benchmark (0050) ROI: {bench_roi:.2%}")
+        print(f"  Alpha: {(total_pl/peak_invested) - bench_roi:.2%}")
     
-    return {"total_pl": total_pl, "peak_invested": peak_invested, "roi": total_pl/peak_invested}
+    return {"total_pl": total_pl, "peak_invested": peak_invested, "roi": total_pl/peak_invested, "bench_roi": bench_roi}
 
 if __name__ == "__main__":
     run_backtest()

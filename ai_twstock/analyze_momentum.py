@@ -18,12 +18,13 @@ MOMENTUM_THRESHOLD = 0.05     # ...漲幅超過幾% 會標記 !
 MIN_TRADING_VALUE = 30000000  # 每日成交金額門檻 (預設3000萬)
 
 # 2. 權重分配 (總和建議 100)
-WEIGHT_GAIN = 50              # 當日/波段漲幅權重 (PureGain 實驗證明此區間最有效)
-WEIGHT_VOLUME = 10            # 交易量突破權重 (量比)
+WEIGHT_GAIN = 40              # 恢復部分漲幅權重，捕捉轉強動能
+WEIGHT_VOLUME = 10            # 交易量突破權重
 WEIGHT_FOREIGN = 10           # 外資挹注權重
 WEIGHT_SITC = 10              # 投信挹注權重
 WEIGHT_VCP = 10               # VCP 波動收斂權重
-WEIGHT_BREAKOUT = 10          # 壓力線突破權重
+WEIGHT_BREAKOUT = 10          # 提高壓力線突破權重
+WEIGHT_HANDOVER = 40          # 加大換手盤整權重
 
 MIN_SCORE_TO_PRINT = 60       # 提高門檻，只看最強勢標的
 
@@ -41,6 +42,11 @@ DEALER_INFLOW_THRESHOLD = 500000
 # 4. VCP 參數
 VCP_LOOKBACK = 60             # 回顧天數
 VCP_MIN_CONTRACTIONS = 2      # 至少要幾次收斂
+
+# 5. 換手盤整參數
+CONSOLIDATION_DAYS = 10       # 盤整期間縮短，更靈敏
+CONSOLIDATION_RANGE = 0.15    # 盤整區間稍微放大 (15% 以內)
+HANDOVER_VOL_RATIO = 0.8      # 盤整期間成交量維持 80% 均量即可
 # =================================================================
 
 # --- 全域快取 ---
@@ -104,6 +110,40 @@ def check_vcp_pattern(price_data, sorted_dates, idx):
     tightness_score = max(0, 100 * (1 - (r3 / 0.15))) if r3 < 0.15 else 0
     
     return is_tightening or (r1 > r3 * 2), tightness_score
+
+def check_handover_consolidation(price_data, sorted_dates, idx):
+    """
+    換手盤整判斷：
+    1. 價格在一段時間內波動極小 (盤整)
+    2. 成交量維持一定水準，沒有明顯縮量 (換手)
+    """
+    if idx < CONSOLIDATION_DAYS + 20:
+        return False, 0
+        
+    lookback_dates = sorted_dates[idx - CONSOLIDATION_DAYS : idx + 1]
+    prices = [price_data[d]['close'] for d in lookback_dates]
+    vols = [price_data[d].get('Trading_Volume', 0) for d in lookback_dates]
+    
+    # 盤整區間判斷
+    max_p, min_p = max(prices), min(prices)
+    price_range = (max_p - min_p) / min_p if min_p > 0 else 1.0
+    is_consolidating = price_range <= CONSOLIDATION_RANGE
+    
+    # 換手判斷 (成交量相對於更長期的均量)
+    long_vols = [price_data[sorted_dates[i]].get('Trading_Volume', 0) for i in range(idx - CONSOLIDATION_DAYS - 20, idx - CONSOLIDATION_DAYS)]
+    avg_long_vol = sum(long_vols) / len(long_vols) if long_vols else 1
+    avg_recent_vol = sum(vols) / len(vols) if vols else 0
+    vol_ratio = avg_recent_vol / avg_long_vol if avg_long_vol > 0 else 0
+    
+    # 換手評分：區間越窄且量能維持越好，分數越高
+    handover_score = 0
+    if is_consolidating:
+        # 價格越平穩分數越高 (最多 50 分)
+        handover_score += max(0, (1 - (price_range / CONSOLIDATION_RANGE)) * 50)
+        # 量能維持越好分數越高 (最多 50 分)
+        handover_score += min(50, (vol_ratio / HANDOVER_VOL_RATIO) * 50)
+        
+    return is_consolidating and vol_ratio >= 0.7, handover_score
 
 def check_institutional_consensus(inst_data, date):
     """
@@ -195,6 +235,7 @@ def calculate_score(details, weights=None):
     w_sitc = weights.get('WEIGHT_SITC', WEIGHT_SITC) if weights else WEIGHT_SITC
     w_vcp = weights.get('WEIGHT_VCP', WEIGHT_VCP) if weights else WEIGHT_VCP
     w_breakout = weights.get('WEIGHT_BREAKOUT', WEIGHT_BREAKOUT) if weights else WEIGHT_BREAKOUT
+    w_handover = weights.get('WEIGHT_HANDOVER', WEIGHT_HANDOVER) if weights else WEIGHT_HANDOVER
 
     score = 0
     # 1. 漲幅評分
@@ -213,7 +254,10 @@ def calculate_score(details, weights=None):
     # 5. VCP 形態評分
     score += (details['vcp_score'] if details['vcp_ok'] else 0) * w_vcp / 100
     
-    # 6. 壓力突破評分
+    # 6. 換手盤整評分 (新)
+    score += (details['handover_score'] if details['handover_ok'] else 0) * w_handover / 100
+    
+    # 7. 壓力突破評分
     if details['breakout_ok']: 
         score += w_breakout
         
@@ -260,6 +304,7 @@ def analyze_momentum(data, start_date, end_date, weights=None):
         sitc_ok, sitc_ratio = check_sitc_momentum(inst_data, sorted_dates, idx)
         foreign_ok, foreign_days = check_foreign_streak(inst_data, sorted_dates, idx)
         vcp_ok, vcp_score = check_vcp_pattern(price_data, sorted_dates, idx)
+        handover_ok, handover_score = check_handover_consolidation(price_data, sorted_dates, idx)
         breakout_ok, res_level = check_resistance_breakout(price_data, sorted_dates, idx)
         inst_status, inst_multiplier = check_institutional_consensus(inst_data, end_date)
         
@@ -268,7 +313,9 @@ def analyze_momentum(data, start_date, end_date, weights=None):
             'industry': industry_map.get(stock_id, '其他'),
             'close': current_price, 'gain': gain, 'vol_ratio': vol_ratio,
             'sitc_ratio': sitc_ratio, 'foreign_days': foreign_days,
-            'vcp_ok': vcp_ok, 'vcp_score': vcp_score, 'breakout_ok': breakout_ok,
+            'vcp_ok': vcp_ok, 'vcp_score': vcp_score, 
+            'handover_ok': handover_ok, 'handover_score': handover_score,
+            'breakout_ok': breakout_ok,
             'inst_multiplier': inst_multiplier, 'inst_status': inst_status,
             'raw_volume': current_vol, 'trading_value': trading_value, 'resistance': res_level,
             'relative_strength': gain - market_gain
@@ -370,6 +417,7 @@ def main():
         if res['inst_status'] == "consensus": note += "法人共識 "
         if res['inst_status'] == "conflict": note += "法人對幹 "
         if res['vcp_ok']: note += "VCP收斂 "
+        if res['handover_ok']: note += "換手盤整 "
         if res['breakout_ok']: note += "突破壓力 "
         
         # 建立每一列的資料項
