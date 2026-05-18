@@ -13,8 +13,8 @@ from common_lib import Color, pad_string, truncate_string, load_stock_data, get_
 # =================================================================
 # 1. 基本門檻與過濾
 MIN_GAIN_REQUIRED = 0.00      # 至少要正報酬才顯示
-MOMENTUM_DAYS = 4             # 幾天內...
-MOMENTUM_THRESHOLD = 0.05     # ...漲幅超過幾% 會標記 !
+MOMENTUM_DAYS = 20             # 延長動能觀察期，捕捉波段主升段
+MOMENTUM_THRESHOLD = 0.10     # 提高門檻，漲幅超過 10% 會標記
 MIN_TRADING_VALUE = 30000000  # 每日成交金額門檻 (預設3000萬)
 
 # 2. 權重分配 (總和建議 100)
@@ -323,8 +323,12 @@ def analyze_momentum(data, start_date, end_date, weights=None):
         res['score'] = calculate_score(res, weights=weights)
         
         # 強勢過濾：如果相對於大盤是弱勢 (RS < 0)，分數打折
+        # 但如果是「換手盤整」標的，則放寬此限制，因為盤整期通常相對強度較低
         if res['relative_strength'] < 0:
-            res['score'] *= 0.5
+            if not res['handover_ok']:
+                res['score'] *= 0.5
+            else:
+                res['score'] *= 0.8 # 換手盤整標的只打 8 折
         elif res['relative_strength'] > 0.05:
             res['score'] *= 1.2 # 超額報酬加成
         results.append(res)

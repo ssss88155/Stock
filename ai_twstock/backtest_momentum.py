@@ -210,10 +210,12 @@ def run_backtest(override_config=None, silent=False):
     weights = _config.get('WEIGHTS', None)
     is_daily = (buy_dates_config == "DAILY")
     
-    # 計算市場廣度 (Market Breadth) 作為濾網
-    def get_market_breadth(date_idx):
-        if date_idx < 10: return 1.0
+    # 計算市場廣度 (Market Breadth) 與 指數趨勢 作為濾網
+    def get_market_filter(date_idx):
+        if date_idx < 20: return True, 1.0
         target_date = all_dates[date_idx]
+        
+        # 1. 市場廣度 (多少股票站在 MA10 之上)
         above_ma = 0; total = 0
         for sid in data:
             prices = [data[sid]['price'][d]['close'] for d in all_dates[date_idx-10:date_idx+1] if d in data[sid]['price']]
@@ -221,7 +223,19 @@ def run_backtest(override_config=None, silent=False):
             ma10 = sum(prices[:-1]) / 10
             if prices[-1] > ma10: above_ma += 1
             total += 1
-        return above_ma / total if total > 0 else 1.0
+        breadth = above_ma / total if total > 0 else 1.0
+        
+        # 2. 指數趨勢 (0050 是否站在 MA20 之上)
+        index_bullish = True
+        if '0050' in data:
+            idx_prices = [data['0050']['price'][d]['close'] for d in all_dates[date_idx-20:date_idx+1] if d in data['0050']['price']]
+            if len(idx_prices) >= 20:
+                ma20 = sum(idx_prices[:-1]) / 20
+                index_bullish = idx_prices[-1] > ma20
+        
+        # 動態門檻：如果指數強勢，廣度門檻放寬到 0.20 (這能確保大盤漲的時候我們有在裡面)；否則維持 0.5
+        threshold = 0.20 if index_bullish else 0.5
+        return (breadth >= threshold), breadth
     actual_buy_dates = {}
     if not is_daily:
         for bd in buy_dates_config:
@@ -309,10 +323,10 @@ def run_backtest(override_config=None, silent=False):
         if is_daily or current_date in actual_buy_dates:
             if idx < 20: continue
             
-            # 使用市場廣度作為過濾器 (Market Breadth Filter)
-            breadth = get_market_breadth(idx)
-            if breadth < 0.5: # 恢復較嚴格門檻，符合「寧可不買」
-                if not silent: print(f"  [SKIPPED] {current_date} Market Breadth too low: {breadth:.1%}")
+            # 使用市場過濾器 (Market Filter: Breadth + Index Trend)
+            pass_filter, breadth = get_market_filter(idx)
+            if not pass_filter:
+                if not silent: print(f"  [SKIPPED] {current_date} Market Condition weak (Breadth: {breadth:.1%})")
                 continue
                 
             start_date_buy = all_dates[idx - 20]
