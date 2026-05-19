@@ -78,7 +78,7 @@ def plot_analysis(stock_id, df, peaks, troughs, sh_summary):
     ax3.grid(True, axis='y', linestyle='--', alpha=0.4)
 
     plt.tight_layout()
-    out_dir = os.path.join(get_script_dir(), 'analyze_independent')
+    out_dir = os.path.join(get_script_dir(__file__), 'analyze_independent')
     if not os.path.exists(out_dir): os.makedirs(out_dir)
     out_file = os.path.join(out_dir, f"report_visual_{stock_id}_{datetime.now().strftime('%Y%m%d')}.png")
     plt.savefig(out_file, dpi=150)
