@@ -181,24 +181,15 @@ def load_stock_data_wrapper(filename='stock_data.json'):
 
 # --- 核心機制函數 ---
 
-# [Upgrade] 連續帶量機制：過濾單日誘多雜訊，要求今日量比>2.0且昨日量比>1.2
 def check_volume_breakthrough(price_data, sorted_dates, idx):
-    if idx < 2: return False, 0
+    if idx < 1: return False, 0
     actual_lookback = min(idx, VOL_AVG_DAYS)
-    
     current_vol = price_data[sorted_dates[idx]].get('Trading_Volume', 0)
-    prev_vol = price_data[sorted_dates[idx-1]].get('Trading_Volume', 0)
-    
-    lookback_vols = [price_data[sorted_dates[i]].get('Trading_Volume', 0) for i in range(idx - actual_lookback - 1, idx - 1)]
-    avg_vol = sum(lookback_vols) / len(lookback_vols) if lookback_vols else 0
+    prev_vols = [price_data[sorted_dates[i]].get('Trading_Volume', 0) for i in range(idx - actual_lookback, idx)]
+    avg_vol = sum(prev_vols) / len(prev_vols) if prev_vols else 0
     if avg_vol == 0: return False, 0
-    
     ratio = current_vol / avg_vol
-    prev_ratio = prev_vol / avg_vol
-    
-    # 修改：要求連續兩天帶量，確保動能具備連續性
-    is_breakthrough = (ratio >= VOL_BREAKTHROUGH_RATIO) and (prev_ratio >= 1.2)
-    return is_breakthrough, ratio
+    return ratio >= VOL_BREAKTHROUGH_RATIO, ratio
 
 def check_sitc_momentum(inst_data, sorted_dates, idx):
     if idx < 1: return False, 0
@@ -301,8 +292,6 @@ def analyze_momentum(data, start_date, end_date, weights=None):
             market_gain = (p0050[end_date]['close'] - p0050[start_date]['close']) / p0050[start_date]['close']
 
     # 第一輪：計算原始分數
-    min_trading_val = weights.get('MIN_TRADING_VALUE', MIN_TRADING_VALUE) if weights else MIN_TRADING_VALUE
-    
     for stock_id, details in data.items():
         if stock_id == '0050': continue # 跳過大盤本身
         price_data = details.get('price', {})
@@ -311,17 +300,11 @@ def analyze_momentum(data, start_date, end_date, weights=None):
         current_price = price_data[end_date]['close']
         current_vol = price_data[end_date].get('Trading_Volume', 0)
         trading_value = current_price * current_vol
-        if trading_value < min_trading_val: continue
-        
+        if trading_value < MIN_TRADING_VALUE: continue
         start_close = price_data[start_date]['close']
         if not start_close: continue
         gain = (current_price - start_close) / start_close
         if gain < MIN_GAIN_REQUIRED: continue
-        
-        # 新增：過熱過濾 (Overextended)
-        # 如果漲幅已經過大 (例如 20 天漲超過 40%)，則不建議買入，除非是換手盤整
-        is_overextended = gain > 0.40
-        
         if stock_id in _SORTED_DATES_CACHE: sorted_dates = _SORTED_DATES_CACHE[stock_id]
         else:
             sorted_dates = sorted(price_data.keys())
@@ -348,21 +331,6 @@ def analyze_momentum(data, start_date, end_date, weights=None):
             'relative_strength': gain - market_gain
         }
         res['score'] = calculate_score(res, weights=weights)
-        
-        # 新增：共識門檻過濾 (Mandatory Consensus)
-        # 只有當至少 3 項以上指標同時達標時，才考慮買入
-        consensus_count = 0
-        if res['vol_ratio'] >= 2.0: consensus_count += 1
-        if res['sitc_ratio'] >= 1.5: consensus_count += 1
-        if res['foreign_days'] >= 3: consensus_count += 1
-        if res['vcp_ok']: consensus_count += 1
-        if res['handover_ok']: consensus_count += 1
-        if res['breakout_ok']: consensus_count += 1
-        if res['inst_status'] == "consensus": consensus_count += 1
-        
-        min_consensus = weights.get('MIN_CONSENSUS_COUNT', 0) if weights else 0
-        if consensus_count < min_consensus:
-            res['score'] = 0 # 不達標則歸零
         
         # 強勢過濾：如果相對於大盤是弱勢 (RS < 0)，分數大幅打折
         # 但如果是「換手盤整」標的，則稍多保留，因為盤整期通常相對強度較低
@@ -394,27 +362,7 @@ def analyze_momentum(data, start_date, end_date, weights=None):
             res['industry_bonus'] = False
 
     # 第三輪：過濾與排序
-    candidates = [r for r in results if r['score'] >= min_score]
-    
-    # [Upgrade] 產業集群過濾門檻：僅買入當日高分標的中，所屬產業排名前 N 大的標的 (確保在主場作戰)
-    industry_filter_n = weights.get('INDUSTRY_FILTER_TOP_N') if weights else None
-    
-    if industry_filter_n and candidates:
-        # 統計候選標的的產業分布
-        cand_ind_count = {}
-        for r in candidates:
-            ind = r['industry']
-            cand_ind_count[ind] = cand_ind_count.get(ind, 0) + 1
-        
-        # 取得前 N 名產業 (至少要有 1 檔以上才算)
-        sorted_cand_ind = sorted(cand_ind_count.items(), key=lambda x: x[1], reverse=True)
-        top_industries = [ind for ind, count in sorted_cand_ind[:industry_filter_n] if count >= 1]
-        
-        # 僅保留屬於前 N 名產業的標的
-        final_results = [r for r in candidates if r['industry'] in top_industries]
-    else:
-        final_results = candidates
-
+    final_results = [r for r in results if r['score'] >= min_score]
     final_results.sort(key=lambda x: (x['score'], x['gain']), reverse=True)
     return final_results
 

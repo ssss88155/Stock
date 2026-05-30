@@ -218,7 +218,10 @@ def run_backtest(override_config=None, silent=False):
     _config = load_config()
     if override_config: _config.update(override_config)
 
+    # [Upgrade] 實戰參數支援
     starting_cash = _config.get('STARTING_CASH', 1000000)
+    monthly_contribution = _config.get('MONTHLY_CONTRIBUTION', 0) # 定期定額注入資金
+    
     daily_invest_pool = _config.get('DAILY_INVEST_POOL', 300000)
     top_n = _config.get('TOP_N', 10)
     buy_dates_config = _config.get('BUY_DATES', ['2026-02-10', '2026-03-10', '2026-04-10'])
@@ -238,13 +241,16 @@ def run_backtest(override_config=None, silent=False):
     
     # 2. 初始化帳戶
     cash = starting_cash
+    total_invested = starting_cash # 用於計算總投入
     portfolio = {} 
     transactions = [] 
-    json_history = OrderedDict() 
-    running_invested_capital = 0
+    json_history = OrderedDict()
     
     # 3. 模擬交易
-    weights = _config.get('WEIGHTS', None)
+    weights = _config.get('WEIGHTS', {})
+    if 'INDUSTRY_FILTER_TOP_N' in _config:
+        weights['INDUSTRY_FILTER_TOP_N'] = _config['INDUSTRY_FILTER_TOP_N']
+        
     is_daily = (buy_dates_config == "DAILY")
     
     # 追蹤每日淨值 (Equity)
@@ -298,6 +304,14 @@ def run_backtest(override_config=None, silent=False):
     for idx in range(start_idx_for_loop, len(all_dates)):
         current_date = all_dates[idx]
         date_key = current_date.replace('-', '')
+        
+        # 定期定額邏輯：每個月的第一個交易日注入資金
+        if monthly_contribution > 0 and idx > start_idx_for_loop:
+            prev_date = all_dates[idx - 1]
+            if current_date[5:7] != prev_date[5:7]:
+                cash += monthly_contribution
+                total_invested += monthly_contribution
+                if not silent: print(f"  [定期定額] {current_date} 注入資金 {monthly_contribution:,.0f}, 目前總投入 {total_invested:,.0f}")
         
         has_holdings = any(p['shares'] > 0 for p in portfolio.values())
         mom_scores = {}
@@ -389,7 +403,9 @@ def run_backtest(override_config=None, silent=False):
             # 排除已持有的標的，避免重複買入
             valid_results = [r for r in valid_results if portfolio.get(r['stock_id'], {}).get('shares', 0) == 0]
             
-            top_stocks = valid_results[:top_n]
+            # [Upgrade] 限制每日買入數量，優先選擇分數最高的前幾名 (去蕪存菁，降低噪音)
+            max_daily_buy = _config.get('MAX_DAILY_BUY', 3)
+            top_stocks = valid_results[:min(len(valid_results), max_daily_buy)]
             num_to_buy = len(top_stocks)
             
             if num_to_buy > 0:
@@ -466,9 +482,8 @@ def run_backtest(override_config=None, silent=False):
         report_rows.append({"編號": sid, "公司": pos['name'], "總盈虧": pos['realized_pl'] + unrealized_pl, "購買金額": pos['total_cost']})
     
     total_pl = sum(r['總盈虧'] for r in report_rows)
-    # 修正 peak_invested 為最高同時持有的市值+現金 (即帳戶總資產的最高點，或簡單用起始資金)
-    # 這裡我們改用起始資金作為分母來計算 ROI，這比較符合一般認知
-    roi = total_pl / starting_cash
+    # 計算 ROI：淨損益 / 總投入資金
+    roi = total_pl / total_invested if total_invested > 0 else 0
     
     # 計算 0050 Benchmark 績效
     bench_roi = 0
@@ -481,6 +496,7 @@ def run_backtest(override_config=None, silent=False):
     if not silent:
         print(f"\n[FINISH] {final_date}")
         print(f"  Total PL: {total_pl:,.0f}")
+        print(f"  Total Invested: {total_invested:,.0f}")
         print(f"  Your ROI: {roi:.2%}")
         print(f"  Benchmark (0050) ROI: {bench_roi:.2%}")
         print(f"  Alpha: {roi - bench_roi:.2%}")
