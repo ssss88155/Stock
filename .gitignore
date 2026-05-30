@@ -26,3 +26,7 @@ venv/
 __pycache__/
 *.pyc
 .DS_Store
+
+# Exclude local temp files
+**/*.tmp
+**/stock_data.json.tmp
