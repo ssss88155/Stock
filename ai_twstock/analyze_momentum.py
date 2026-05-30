@@ -179,6 +179,59 @@ def check_institutional_consensus(inst_data, date):
 def load_stock_data_wrapper(filename='stock_data.json'):
     return load_stock_data(filename, __file__)
 
+# --- 技術指標計算 ---
+
+def calculate_ema(prices, periods):
+    """計算指數移動平均線 (EMA)"""
+    if len(prices) < periods:
+        return prices[-1] if prices else 0
+    
+    alpha = 2 / (periods + 1)
+    ema = prices[0]
+    for price in prices[1:]:
+        ema = price * alpha + ema * (1 - alpha)
+    return ema
+
+def calculate_macd(price_data, sorted_dates, idx):
+    """
+    計算 MACD 指標 (12, 26, 9)
+    回傳: DIF, MACD_Signal, Histogram (OSC)
+    """
+    # 至少需要 26+9 = 35 天的數據來計算相對穩定的 MACD
+    LOOKBACK = 60
+    if idx < LOOKBACK:
+        return 0, 0, 0
+    
+    lookback_dates = sorted_dates[idx - LOOKBACK : idx + 1]
+    prices = [price_data[d]['close'] for d in lookback_dates]
+    
+    # 1. 計算 DIF (EMA12 - EMA26)
+    # 為了計算 Signal Line (EMA9 of DIF)，我們需要一段時間的 DIF
+    dif_history = []
+    for i in range(26, len(prices) + 1):
+        window = prices[:i]
+        ema12 = calculate_ema(window, 12)
+        ema26 = calculate_ema(window, 26)
+        dif_history.append(ema12 - ema26)
+    
+    if len(dif_history) < 9:
+        return dif_history[-1], 0, dif_history[-1], 0, 0, 0
+    
+    # 2. 計算 MACD Signal (EMA9 of DIF)
+    macd_signal = calculate_ema(dif_history, 9)
+    
+    # 3. 計算 Histogram (OSC)
+    dif = dif_history[-1]
+    osc = dif - macd_signal
+    
+    # 為了判斷趨勢，我們也需要「昨日」的資料
+    prev_dif = dif_history[-2]
+    # 計算昨日的 Signal Line
+    prev_macd_signal = calculate_ema(dif_history[:-1], 9)
+    prev_osc = prev_dif - prev_macd_signal
+    
+    return dif, macd_signal, osc, prev_dif, prev_macd_signal, prev_osc
+
 # --- 核心機制函數 ---
 
 # [Upgrade] 連續帶量機制：過濾單日誘多雜訊，要求今日量比>2.0且昨日量比>1.2
@@ -335,6 +388,25 @@ def analyze_momentum(data, start_date, end_date, weights=None):
         breakout_ok, res_level = check_resistance_breakout(price_data, sorted_dates, idx)
         inst_status, inst_multiplier = check_institutional_consensus(inst_data, end_date)
         
+        # [Upgrade] 593%演算法升級 (第二門檻)並減少亂買：MACD 與量能持有的依據
+        dif, macd_sig, osc, prev_dif, prev_macd_sig, prev_osc = calculate_macd(price_data, sorted_dates, idx)
+        
+        # 條件 1: 綠柱(負值)準備要回到0、看起來要到正的時候 (柱狀體大於昨日)
+        osc_improving = (osc > prev_osc)
+        # 條件 2: DIF 準備要往上 和 MACD線交叉 (準備黃金交叉或已交叉)
+        macd_golden_cross = (dif > macd_sig) or (dif > prev_dif and (macd_sig - dif) < abs(dif * 0.05))
+        # 條件 3: 成交量沒有明顯萎縮 (維持在 5 日均量的 80% 以上)
+        vol_stable = False
+        if idx >= 5:
+            avg_vol_5 = sum([price_data[sorted_dates[i]].get('Trading_Volume', 0) for i in range(idx-5, idx)]) / 5
+            if current_vol >= avg_vol_5 * 0.8:
+                vol_stable = True
+        
+        # 綜合判定安全持有
+        safety_hold = osc_improving and macd_golden_cross and vol_stable
+        # 作為減少亂買的第二門檻信號
+        macd_buy_signal = osc_improving and macd_golden_cross
+        
         res = {
             'stock_id': stock_id, 'name': details.get('name', ''),
             'industry': industry_map.get(stock_id, '其他'),
@@ -345,10 +417,17 @@ def analyze_momentum(data, start_date, end_date, weights=None):
             'breakout_ok': breakout_ok,
             'inst_multiplier': inst_multiplier, 'inst_status': inst_status,
             'raw_volume': current_vol, 'trading_value': trading_value, 'resistance': res_level,
-            'relative_strength': gain - market_gain
+            'relative_strength': gain - market_gain,
+            'safety_hold': safety_hold, # [Upgrade] MACD+量能安全持有旗標
+            'macd_buy_signal': macd_buy_signal, # [Upgrade] 593%演算法升級 (第二門檻)
+            'macd_details': {'osc': osc, 'dif': dif, 'macd_sig': macd_sig}
         }
         res['score'] = calculate_score(res, weights=weights)
         
+        # [Upgrade] 593%演算法升級：減少亂買 (第二門檻)
+        if not res['macd_buy_signal']:
+            res['score'] *= 0.5 # 未達 MACD 轉強條件，分數減半，降低亂買機率
+            
         # 新增：共識門檻過濾 (Mandatory Consensus)
         # 只有當至少 3 項以上指標同時達標時，才考慮買入
         consensus_count = 0

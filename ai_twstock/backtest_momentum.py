@@ -321,8 +321,11 @@ def run_backtest(override_config=None, silent=False):
                 start_date_mom = all_dates[max(0, idx - 1 - 20)]
                 results = analyze_momentum.analyze_momentum(data, start_date_mom, analysis_date, weights=weights)
                 mom_scores = {r['stock_id']: r['score'] for r in results}
+                # [Upgrade] 紀錄安全持有旗標 (MACD+量能)
+                safety_hold_map = {r['stock_id']: r.get('safety_hold', False) for r in results}
             else:
                 mom_scores = {}
+                safety_hold_map = {}
 
         if has_holdings:
             sids = list(portfolio.keys())
@@ -339,14 +342,33 @@ def run_backtest(override_config=None, silent=False):
                 # 或是如果 profit_ratio 已經低於門檻，應立即出清
                 sell_reason = None
                 is_full_exit = False
+                
+                # [Upgrade] 引入 MACD + 量能安全持有門檻
+                is_safe = safety_hold_map.get(sid, False)
+                
                 if profit_ratio <= stop_loss_threshold:
-                    # 限制顯示的停損比例（如果是資料錯誤造成的巨大跌幅）
+                    # 硬停損 (Hard Stop)：即便技術指標尚可，為了風控依然必須出清
                     actual_loss_ratio = max(profit_ratio, stop_loss_threshold - 0.03) 
                     sell_reason = f"停損 {actual_loss_ratio:.1%}"; is_full_exit = True
                 elif drop_from_peak <= trailing_stop_threshold:
-                    sell_reason = f"移動停扣 {drop_from_peak:.1%}"; is_full_exit = True
+                    # 移動停扣：若滿足安全持有條件，則暫緩賣出以避開洗盤
+                    if is_safe:
+                        if not silent: print(f"  [觸發移動停扣但啟動安全持有] {current_date} {sid} {pos['name']}")
+                    else:
+                        sell_reason = f"移動停扣 {drop_from_peak:.1%}"; is_full_exit = True
                 elif mom_scores.get(sid, 0) < momentum_exit_threshold:
-                    sell_reason = f"動能減退 {mom_scores.get(sid, 0):.0f}"; is_full_exit = True
+                    # 動能減退：若滿足安全持有條件，則暫緩賣出
+                    if is_safe:
+                        if not silent: print(f"  [觸發動能減退但啟動安全持有] {current_date} {sid} {pos['name']}")
+                    else:
+                        exit_score = mom_scores.get(sid, 0)
+                        sell_reason = f"動能減退 {exit_score:.1f}"; is_full_exit = True
+                    # [DEBUG] 列印詳細動能退出資訊
+                    if not silent:
+                        buy_price = pos['avg_price']
+                        buy_score = pos.get('buy_score', 0)
+                        profit_pct = (curr_price - buy_price) / buy_price
+                        print(f"  [動能退出詳情] {current_date} {sid} {pos['name']}: 現價 {curr_price:.2f}, 買價 {buy_price:.2f}, 損益 {profit_pct:.1%}, 買入分數 {buy_score:.1f} -> 退出分數 {exit_score:.1f}")
 
                 if is_full_exit:
                     # 模擬以停損價或當前價賣出
@@ -360,7 +382,8 @@ def run_backtest(override_config=None, silent=False):
                     # 在此為了修正資料異常造成的負值，我們稍微寬容
                     
                     shares_to_sell = pos['shares']; rev = shares_to_sell * exit_price
-                    s_fee = round(rev * 0.001425); s_tax = round(rev * 0.003); net_rev = rev - s_fee - s_tax; cash += net_rev
+                    # [Upgrade] 實戰交易成本：賣出手續費 0.15%，證交稅 0.3%
+                    s_fee = round(rev * 0.0015); s_tax = round(rev * 0.003); net_rev = rev - s_fee - s_tax; cash += net_rev
                     pos['realized_pl'] = pos.get('realized_pl', 0) + (exit_price - pos['avg_price']) * shares_to_sell - s_fee - s_tax
                     pos['total_sold_revenue'] = pos.get('total_sold_revenue', 0) + net_rev; pos['shares'] = 0
                     pos['total_cost'] = 0 # 出清後成本歸零
@@ -373,7 +396,9 @@ def run_backtest(override_config=None, silent=False):
                 if profit_ratio >= take_profit_half_threshold and not pos.get('half_sold', False):
                     shares_to_sell = pos['shares'] // 2
                     if shares_to_sell > 0:
-                        rev = shares_to_sell * curr_price; s_fee = round(rev * 0.001425); s_tax = round(rev * 0.003)
+                        rev = shares_to_sell * curr_price; 
+                        # [Upgrade] 實戰交易成本：賣出手續費 0.15%，證交稅 0.3%
+                        s_fee = round(rev * 0.0015); s_tax = round(rev * 0.003)
                         net_rev = rev - s_fee - s_tax; cash += net_rev; pos['shares'] -= shares_to_sell
                         pos['total_cost'] -= (pos['avg_price'] * shares_to_sell) # 減少成本基數
                         pos['realized_pl'] = pos.get('realized_pl', 0) + (curr_price - pos['avg_price']) * shares_to_sell - s_fee - s_tax
@@ -428,11 +453,13 @@ def run_backtest(override_config=None, silent=False):
                     shares = buy_amount // price
                     actual_cost = shares * price
                     if shares > 0:
-                        fee = round(actual_cost * 0.001425); cash -= (actual_cost + fee)
+                        # [Upgrade] 實戰交易成本：買入免手續費
+                        fee = 0; cash -= (actual_cost + fee)
                         if sid not in portfolio:
                             portfolio[sid] = {'shares': 0, 'total_cost': 0, 'name': stock_names.get(sid, sid), 'buys': [], 'realized_pl': 0, 'total_sold_revenue': 0, 'max_price': price}
                         portfolio[sid]['shares'] += shares; portfolio[sid]['total_cost'] += (actual_cost + fee)
                         portfolio[sid]['avg_price'] = portfolio[sid]['total_cost'] / portfolio[sid]['shares']
+                        portfolio[sid]['buy_score'] = res['score'] # 紀錄買入時的分數
                         portfolio[sid]['buys'].append({'date': current_date, 'price': price, 'shares': shares, 'cost': actual_cost + fee})
                         transactions.append({'date': current_date, 'stock_id': sid, 'side': 'B', 'shares': shares, 'price': price, 'cost': actual_cost + fee})
                         json_history[date_key].append({"stk_no": sid, "stk_na": portfolio[sid]['name'], "side": "B", "price_avg": float(price), "qty": float(shares), "amount": float(actual_cost), "fee": float(fee), "profit": 0.0})
@@ -510,6 +537,7 @@ def run_backtest(override_config=None, silent=False):
     return {
         "total_pl": total_pl, 
         "starting_cash": starting_cash, 
+        "total_invested": total_invested,
         "roi": roi, 
         "bench_roi": bench_roi,
         "transactions": transactions,
