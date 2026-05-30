@@ -223,27 +223,64 @@ def main():
             h_wids = [8, 14, 12, 12, 12, 10, 10, 10, 12]
             print("".join(pad_string(h, w, 'center') for h, w in zip(h_cols, h_wids)))
             print("-" * 110)
+            total_buy = 0
+            total_sell = 0
+            total_cash_pl = 0
+            total_pl = 0
             for r in rows:
-                line = pad_string(r["編號"], h_wids[0], 'left')
-                line += pad_string(r["公司"], h_wids[1], 'left')
-                line += pad_string(f"{r['購買金額']:,.0f}", h_wids[2], 'right')
-                line += pad_string(f"{r['賣出金額']:,.0f}", h_wids[3], 'right')
-                line += pad_string(f"{r['現金盈虧']:,.0f}", h_wids[4], 'right')
-                line += pad_string(f"{r['尚餘股數']:,.1f}", h_wids[5], 'right')
-                line += pad_string(f"{r['均價']:.2f}", h_wids[6], 'right')
-                line += pad_string(f"{r['現價']:.2f}", h_wids[7], 'right')
-                line += pad_string(f"{r['總盈虧']:,.0f}", h_wids[8], 'right')
-                
                 # 只有當 (尚餘股數為 0) 且 (本月完全沒交易) 時才變淡 (Color.DIM)
-                if r["尚餘股數"] == 0 and r["編號"] not in traded_this_month:
-                    print(Color.wrap(line, Color.DIM))
+                is_dim = (r["尚餘股數"] == 0 and r["編號"] not in traded_this_month)
+                
+                if not is_dim:
+                    total_buy += r['購買金額']
+                    total_sell += r['賣出金額']
+                    total_cash_pl += r['現金盈虧']
+                    total_pl += r['總盈虧']
+
+                line_parts = [
+                    pad_string(r["編號"], h_wids[0], 'left'),
+                    pad_string(r["公司"], h_wids[1], 'left'),
+                    pad_string(f"{r['購買金額']:,.0f}", h_wids[2], 'right'),
+                    pad_string(f"{r['賣出金額']:,.0f}", h_wids[3], 'right'),
+                    pad_string(f"{r['現金盈虧']:,.0f}", h_wids[4], 'right'),
+                    pad_string(f"{r['尚餘股數']:,.1f}", h_wids[5], 'right'),
+                    pad_string(f"{r['均價']:.2f}", h_wids[6], 'right'),
+                    pad_string(f"{r['現價']:.2f}", h_wids[7], 'right'),
+                    pad_string(f"{r['總盈虧']:,.0f}", h_wids[8], 'right')
+                ]
+                
+                if is_dim:
+                    print(Color.wrap("".join(line_parts), Color.DIM))
                 else:
-                    print(line)
+                    # 總盈虧配色：負數綠色，正數紅色
+                    if r["總盈虧"] < 0:
+                        line_parts[8] = Color.wrap(line_parts[8], Color.GREEN)
+                    elif r["總盈虧"] > 0:
+                        line_parts[8] = Color.wrap(line_parts[8], Color.RED)
+                    print("".join(line_parts))
+
             print("-" * 110)
-            s_cash = sum(r['現金盈虧'] for r in rows)
+            # 總結列 (僅計算非灰色/活躍項目)
+            sum_line_parts = [
+                pad_string("合計 (活躍)", h_wids[0] + h_wids[1], 'left'),
+                pad_string(f"{total_buy:,.0f}", h_wids[2], 'right'),
+                pad_string(f"{total_sell:,.0f}", h_wids[3], 'right'),
+                pad_string(f"{total_cash_pl:,.0f}", h_wids[4], 'right'),
+                pad_string("", h_wids[5] + h_wids[6] + h_wids[7], 'right'),
+                pad_string(f"{total_pl:,.0f}", h_wids[8], 'right')
+            ]
+            if total_pl < 0:
+                sum_line_parts[5] = Color.wrap(sum_line_parts[5], Color.GREEN)
+            elif total_pl > 0:
+                sum_line_parts[5] = Color.wrap(sum_line_parts[5], Color.RED)
+            print("".join(sum_line_parts))
+            print("-" * 110)
+            
+            # 使用活躍項目的加總更新下方統計資料
+            s_cash = total_cash_pl
             print(f"該時段投入金額 (最高成本): {current_peak:,.0f} 元")
             print(f"累計現金盈虧 (已實現): {s_cash:,.0f} 元 ({(s_cash/current_peak*100):.2f}%)")
-            print(f"最終預估盈虧 (含持股): {current_total_pl:,.0f} 元 ({(current_total_pl/current_peak*100):.2f}%)")
+            print(f"最終預估盈虧 (活躍持股): {total_pl:,.0f} 元 ({(total_pl/current_peak*100):.2f}%)")
             print("-" * 110 + "\n")
 
         # --- 月份變動表 ---

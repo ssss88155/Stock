@@ -174,9 +174,46 @@ def load_stock_names():
         except Exception as e: print(f"[WARN] Error loading stock names: {e}")
     return names
 
+def preprocess_data(data):
+    """
+    修正資料中的拆股/除權息影響 (目前僅針對 0050 這種極端跳空)
+    如果偵測到單日跌幅超過 40%，則將該日前的所有價格等比例下調
+    """
+    # 檢查是否已經預處理過，避免重複執行
+    if getattr(preprocess_data, '_already_done', False):
+        return data
+    
+    for sid in data:
+        prices = data[sid].get('price', {})
+        if not prices: continue
+        sorted_dates = sorted(prices.keys())
+        
+        # 從後往前找跳空
+        for i in range(len(sorted_dates) - 1, 0, -1):
+            curr_date = sorted_dates[i]
+            prev_date = sorted_dates[i-1]
+            curr_close = prices[curr_date]['close']
+            prev_close = prices[prev_date]['close']
+            
+            if prev_close > 0 and curr_close < prev_close * 0.6: # 跌幅超過 40% 視為拆分
+                ratio = curr_close / prev_close
+                if ratio < 0.3: ratio = 0.25
+                elif ratio < 0.6: ratio = 0.5
+                
+                # 將該日之前的所有價格都調整
+                for j in range(i):
+                    d = sorted_dates[j]
+                    for k in ['open', 'high', 'low', 'close']:
+                        if k in prices[d]:
+                            prices[d][k] *= ratio
+    
+    preprocess_data._already_done = True
+    return data
+
 def run_backtest(override_config=None, silent=False):
     # 1. 載入資料與設定
     data = analyze_momentum.load_stock_data_wrapper(DATA_FILE)
+    data = preprocess_data(data) # 預處理資料以修正拆股
     stock_names = load_stock_names()
     _config = load_config()
     if override_config: _config.update(override_config)
@@ -210,6 +247,9 @@ def run_backtest(override_config=None, silent=False):
     weights = _config.get('WEIGHTS', None)
     is_daily = (buy_dates_config == "DAILY")
     
+    # 追蹤每日淨值 (Equity)
+    daily_equity = []
+
     # 計算市場廣度 (Market Breadth) 與 指數趨勢 作為濾網
     def get_market_filter(date_idx):
         if date_idx < 20: return True, 1.0
@@ -233,8 +273,11 @@ def run_backtest(override_config=None, silent=False):
                 ma20 = sum(idx_prices[:-1]) / 20
                 index_bullish = idx_prices[-1] > ma20
         
-        # 動態門檻：如果指數強勢，廣度門檻放寬到 0.20 (這能確保大盤漲的時候我們有在裡面)；否則維持 0.5
-        threshold = 0.20 if index_bullish else 0.5
+        # 大多頭市場優化：如果指數強勢，忽略廣度濾網 (或降到極低)
+        if index_bullish:
+            return True, breadth
+        
+        threshold = 0.5
         return (breadth >= threshold), breadth
     actual_buy_dates = {}
     if not is_daily:
@@ -259,9 +302,13 @@ def run_backtest(override_config=None, silent=False):
         has_holdings = any(p['shares'] > 0 for p in portfolio.values())
         mom_scores = {}
         if has_holdings or is_daily or (current_date in actual_buy_dates):
-            start_date_mom = all_dates[idx - 20] if idx >= 20 else all_dates[0]
-            results = analyze_momentum.analyze_momentum(data, start_date_mom, current_date, weights=weights)
-            mom_scores = {r['stock_id']: r['score'] for r in results}
+            if idx > 0:
+                analysis_date = all_dates[idx - 1]
+                start_date_mom = all_dates[max(0, idx - 1 - 20)]
+                results = analyze_momentum.analyze_momentum(data, start_date_mom, analysis_date, weights=weights)
+                mom_scores = {r['stock_id']: r['score'] for r in results}
+            else:
+                mom_scores = {}
 
         if has_holdings:
             sids = list(portfolio.keys())
@@ -302,6 +349,7 @@ def run_backtest(override_config=None, silent=False):
                     s_fee = round(rev * 0.001425); s_tax = round(rev * 0.003); net_rev = rev - s_fee - s_tax; cash += net_rev
                     pos['realized_pl'] = pos.get('realized_pl', 0) + (exit_price - pos['avg_price']) * shares_to_sell - s_fee - s_tax
                     pos['total_sold_revenue'] = pos.get('total_sold_revenue', 0) + net_rev; pos['shares'] = 0
+                    pos['total_cost'] = 0 # 出清後成本歸零
                     transactions.append({'date': current_date, 'stock_id': sid, 'side': 'S', 'shares': shares_to_sell, 'price': exit_price, 'revenue': net_rev})
                     if date_key not in json_history: json_history[date_key] = []
                     json_history[date_key].append({"stk_no": sid, "stk_na": pos['name'], "side": "S", "price_avg": float(exit_price), "qty": float(shares_to_sell), "amount": float(rev), "fee": float(s_fee + s_tax), "profit": float((exit_price - pos['avg_price']) * shares_to_sell)})
@@ -313,6 +361,7 @@ def run_backtest(override_config=None, silent=False):
                     if shares_to_sell > 0:
                         rev = shares_to_sell * curr_price; s_fee = round(rev * 0.001425); s_tax = round(rev * 0.003)
                         net_rev = rev - s_fee - s_tax; cash += net_rev; pos['shares'] -= shares_to_sell
+                        pos['total_cost'] -= (pos['avg_price'] * shares_to_sell) # 減少成本基數
                         pos['realized_pl'] = pos.get('realized_pl', 0) + (curr_price - pos['avg_price']) * shares_to_sell - s_fee - s_tax
                         pos['total_sold_revenue'] = pos.get('total_sold_revenue', 0) + net_rev; pos['half_sold'] = True
                         transactions.append({'date': current_date, 'stock_id': sid, 'side': 'S', 'shares': shares_to_sell, 'price': curr_price, 'revenue': net_rev})
@@ -329,22 +378,41 @@ def run_backtest(override_config=None, silent=False):
                 if not silent: print(f"  [SKIPPED] {current_date} Market Condition weak (Breadth: {breadth:.1%})")
                 continue
                 
-            start_date_buy = all_dates[idx - 20]
-            results_buy = analyze_momentum.analyze_momentum(data, start_date_buy, current_date)
+            if idx > 0:
+                analysis_date = all_dates[idx - 1]
+                start_date_buy = all_dates[max(0, idx - 1 - 20)]
+                results_buy = analyze_momentum.analyze_momentum(data, start_date_buy, analysis_date, weights=weights)
+            else:
+                results_buy = []
             valid_results = [r for r in results_buy if r['stock_id'] in data and current_date in data[r['stock_id']]['price'] and r['score'] >= buy_score_threshold]
+            
+            # 排除已持有的標的，避免重複買入
+            valid_results = [r for r in valid_results if portfolio.get(r['stock_id'], {}).get('shares', 0) == 0]
+            
             top_stocks = valid_results[:top_n]
             num_to_buy = len(top_stocks)
+            
             if num_to_buy > 0:
-                # 根據市場廣度動態調整投資池
-                effective_pool = daily_invest_pool * (1.2 if breadth > 0.7 else (0.5 if breadth < 0.5 else 1.0))
-                target_allocations = calculate_allocations(num_to_buy, effective_pool, min_last_pos_ratio)
+                # 動態計算每檔標的投入金額：使用當前可用現金，平均分配給預計買入的標的
+                # 這裡我們限制單次買入不超過總資產的 20%，確保分散風險
+                current_portfolio_value = sum(p['shares'] * data[sid]['price'][current_date]['close'] for sid, p in portfolio.items() if p['shares'] > 0 and current_date in data[sid]['price'])
+                total_equity = cash + current_portfolio_value
+                
+                # 每次買入儘量將現金用掉，但單檔不超過 Equity 的 15%
+                per_stock_limit = total_equity * 0.15
+                target_amount = min(cash / num_to_buy, per_stock_limit)
+                
                 if date_key not in json_history: json_history[date_key] = []
                 for i, res in enumerate(top_stocks):
-                    sid = res['stock_id']; price = res['close']; target_amount = target_allocations[i]
-                    if cash <= 0: break
-                    max_buyable = min(cash, target_amount); shares = max_buyable // price; actual_cost = shares * price
+                    sid = res['stock_id']
+                    price = data[sid]['price'][current_date].get('open', res['close'])
+                    if price <= 0 or cash <= 0: continue
+                    
+                    buy_amount = min(cash, target_amount)
+                    shares = buy_amount // price
+                    actual_cost = shares * price
                     if shares > 0:
-                        fee = round(actual_cost * 0.001425); cash -= (actual_cost + fee); running_invested_capital += (actual_cost + fee)
+                        fee = round(actual_cost * 0.001425); cash -= (actual_cost + fee)
                         if sid not in portfolio:
                             portfolio[sid] = {'shares': 0, 'total_cost': 0, 'name': stock_names.get(sid, sid), 'buys': [], 'realized_pl': 0, 'total_sold_revenue': 0, 'max_price': price}
                         portfolio[sid]['shares'] += shares; portfolio[sid]['total_cost'] += (actual_cost + fee)
@@ -357,7 +425,37 @@ def run_backtest(override_config=None, silent=False):
                         if res.get('handover_ok'): note += "[換手盤整] "
                         if res.get('vcp_ok'): note += "[VCP] "
                         if not silent: print(f"  [買入] {current_date} {sid} {portfolio[sid]['name']} 價格: {price:.2f} 分數: {res['score']:.1f} {note}")
-                if json_history[date_key]: json_history[date_key][-1]["invested_capital_snapshot"] = float(running_invested_capital)
+                
+                # 更新 Snapshot 為當前總資產 (Equity)
+                final_val = cash + sum(p['shares'] * data[sid]['price'][current_date]['close'] for sid, p in portfolio.items() if p['shares'] > 0 and current_date in data[sid]['price'])
+                if json_history[date_key]: json_history[date_key][-1]["invested_capital_snapshot"] = float(final_val)
+
+        # 確保每天最後都至少有一個基本紀錄（即便沒交易），以便追蹤淨值
+        if date_key not in json_history:
+            json_history[date_key] = []
+        
+        # 取得當前總資產 (加總所有持股的市值)
+        current_portfolio_value = 0
+        for sid, p in portfolio.items():
+            if p['shares'] <= 0: continue
+            # 優先使用當前日期價格，若無則使用該標的最後一個可用價格
+            if current_date in data[sid]['price']:
+                p_val = data[sid]['price'][current_date]['close']
+            else:
+                available_dates = sorted([d for d in data[sid]['price'].keys() if d < current_date])
+                p_val = data[sid]['price'][available_dates[-1]]['close'] if available_dates else 0
+            current_portfolio_value += p['shares'] * p_val
+            
+        daily_total_val = cash + current_portfolio_value
+        
+        # 確保 snapshot 被紀錄
+        if date_key not in json_history:
+            json_history[date_key] = []
+        
+        if not json_history[date_key]:
+            json_history[date_key].append({"stk_no": "CASH", "stk_na": "現金", "side": "INFO", "invested_capital_snapshot": float(daily_total_val)})
+        else:
+            json_history[date_key][-1]["invested_capital_snapshot"] = float(daily_total_val)
 
     # 5. 結算
     final_date = all_dates[-1]
@@ -368,7 +466,9 @@ def run_backtest(override_config=None, silent=False):
         report_rows.append({"編號": sid, "公司": pos['name'], "總盈虧": pos['realized_pl'] + unrealized_pl, "購買金額": pos['total_cost']})
     
     total_pl = sum(r['總盈虧'] for r in report_rows)
-    peak_invested = running_invested_capital if running_invested_capital > 0 else 1
+    # 修正 peak_invested 為最高同時持有的市值+現金 (即帳戶總資產的最高點，或簡單用起始資金)
+    # 這裡我們改用起始資金作為分母來計算 ROI，這比較符合一般認知
+    roi = total_pl / starting_cash
     
     # 計算 0050 Benchmark 績效
     bench_roi = 0
@@ -381,11 +481,26 @@ def run_backtest(override_config=None, silent=False):
     if not silent:
         print(f"\n[FINISH] {final_date}")
         print(f"  Total PL: {total_pl:,.0f}")
-        print(f"  Your ROI: {total_pl/peak_invested:.2%}")
+        print(f"  Your ROI: {roi:.2%}")
         print(f"  Benchmark (0050) ROI: {bench_roi:.2%}")
-        print(f"  Alpha: {(total_pl/peak_invested) - bench_roi:.2%}")
+        print(f"  Alpha: {roi - bench_roi:.2%}")
     
-    return {"total_pl": total_pl, "peak_invested": peak_invested, "roi": total_pl/peak_invested, "bench_roi": bench_roi}
+    # 儲存 json_history 供報表使用
+    history_path = os.path.join(os.path.dirname(__file__), 'temp_data', 'backtest_history.json')
+    os.makedirs(os.path.dirname(history_path), exist_ok=True)
+    with open(history_path, 'w', encoding='utf-8') as f:
+        json.dump(json_history, f, ensure_ascii=False, indent=2)
+
+    return {
+        "total_pl": total_pl, 
+        "starting_cash": starting_cash, 
+        "roi": roi, 
+        "bench_roi": bench_roi,
+        "transactions": transactions,
+        "portfolio": portfolio,
+        "report_rows": report_rows,
+        "history": json_history
+    }
 
 if __name__ == "__main__":
     run_backtest()

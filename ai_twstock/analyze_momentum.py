@@ -109,7 +109,17 @@ def check_vcp_pattern(price_data, sorted_dates, idx):
     # 收斂評分：r3 越小分數越高 (r3 < 5% 是理想狀態)
     tightness_score = max(0, 100 * (1 - (r3 / 0.15))) if r3 < 0.15 else 0
     
-    return is_tightening or (r1 > r3 * 2), tightness_score
+    # 新增：量縮檢查 (Volume Dry-up)
+    # 最後一段的平均成交量應小於前兩段
+    vols1 = [price_data[d].get('Trading_Volume', 0) for d in lookback_dates[:segment_size]]
+    vols3 = [price_data[d].get('Trading_Volume', 0) for d in lookback_dates[segment_size*2:]]
+    if vols1 and vols3:
+        avg_v1 = sum(vols1) / len(vols1)
+        avg_v3 = sum(vols3) / len(vols3)
+        if avg_v3 < avg_v1 * 0.8: # 量縮 20% 以上
+            tightness_score += 20
+    
+    return is_tightening or (r1 > r3 * 2), min(100, tightness_score)
 
 def check_handover_consolidation(price_data, sorted_dates, idx):
     """
@@ -322,15 +332,17 @@ def analyze_momentum(data, start_date, end_date, weights=None):
         }
         res['score'] = calculate_score(res, weights=weights)
         
-        # 強勢過濾：如果相對於大盤是弱勢 (RS < 0)，分數打折
-        # 但如果是「換手盤整」標的，則放寬此限制，因為盤整期通常相對強度較低
+        # 強勢過濾：如果相對於大盤是弱勢 (RS < 0)，分數大幅打折
+        # 但如果是「換手盤整」標的，則稍多保留，因為盤整期通常相對強度較低
         if res['relative_strength'] < 0:
             if not res['handover_ok']:
-                res['score'] *= 0.5
+                res['score'] *= 0.3
             else:
-                res['score'] *= 0.8 # 換手盤整標的只打 8 折
+                res['score'] *= 0.6 # 換手盤整標的打 6 折
+        elif res['relative_strength'] > 0.10:
+            res['score'] *= 2.0 # 超額報酬 > 10% 給予翻倍加成
         elif res['relative_strength'] > 0.05:
-            res['score'] *= 1.2 # 超額報酬加成
+            res['score'] *= 1.5 # 超額報酬 > 5% 給予 1.5x 加成
         results.append(res)
     
     # 第二輪：產業集群加成 (Sector Momentum Bonus)
