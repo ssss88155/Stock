@@ -200,7 +200,7 @@ def calculate_macd(price_data, sorted_dates, idx):
     # 至少需要 26+9 = 35 天的數據來計算相對穩定的 MACD
     LOOKBACK = 60
     if idx < LOOKBACK:
-        return 0, 0, 0
+        return 0, 0, 0, 0, 0, 0
     
     lookback_dates = sorted_dates[idx - LOOKBACK : idx + 1]
     prices = [price_data[d]['close'] for d in lookback_dates]

@@ -1,4 +1,4 @@
-import os
+奧動import os
 import json
 import pandas as pd
 import sys
@@ -65,7 +65,32 @@ def generate_report():
         best_cfg = json.load(f)
 
     log_print("正在執行最佳組合回測以生成報表...")
-    res = backtest_momentum.run_backtest(override_config=best_cfg, silent=True)
+    
+    # Capture the output of backtest to output.txt
+    import sys
+    import io
+    old_stdout = sys.stdout
+    new_stdout = io.StringIO()
+    sys.stdout = new_stdout
+    
+    try:
+        # IMPORTANT: Run backtest with silent=False to capture ALL transaction logs
+        res = backtest_momentum.run_backtest(override_config=best_cfg, silent=False)
+    finally:
+        sys.stdout = old_stdout
+        
+    # The output from run_backtest includes ANSI color codes, we might want to keep them 
+    # or strip them depending on what C:\jupyter_notebook\ai_twstock\output.txt looks like.
+    # Looking at the previous read of output.txt, it seems to have some encoding/char issues 
+    # but generally follows the log format.
+    backtest_log = new_stdout.getvalue()
+    
+    # Save the log to temp_data/output.txt
+    with open(r"C:\jupyter_notebook\ai_twstock\temp_data\output.txt", "w", encoding="utf-8") as f_out:
+        f_out.write(backtest_log)
+    
+    # Also overwrite the root output.txt to keep it in sync if needed, 
+    # but the task specifically asked for the one in temp_data.
     
     history = res['history']
     portfolio = res['portfolio']
@@ -212,6 +237,10 @@ def generate_report():
     print(final_msg)
     log_f.write(final_msg + "\n")
     log_f.close()
+    
+    # Note: output.txt was already generated above by capturing sys.stdout during run_backtest.
+    # No further copying of monthly_report.txt into output.txt should occur.
+    pass
 
 if __name__ == "__main__":
     generate_report()

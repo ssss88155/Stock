@@ -28,5 +28,7 @@ __pycache__/
 .DS_Store
 
 # Exclude local temp files
+monthly_report.txt
+output.txt
 **/*.tmp
 **/stock_data.json.tmp
