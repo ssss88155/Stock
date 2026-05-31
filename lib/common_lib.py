@@ -105,6 +105,17 @@ def load_independent_stock_data(stock_id, base_dir):
         except Exception: pass
     return {}
 
+def load_independent_stock_data_custom(stock_id, base_dir, dir_name):
+    """載入獨立的個股 JSON 資料 (自定義目錄名稱)"""
+    path = os.path.join(base_dir, dir_name, f"{stock_id}.json")
+    if os.path.exists(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return data.get(stock_id, {})
+        except Exception: pass
+    return {}
+
 def sync_independent_data(target_path):
     """將 data_independent 中的更新同步到大 JSON 檔案"""
     base_dir = os.path.dirname(target_path)
