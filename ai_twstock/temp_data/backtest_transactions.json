@@ -1,0 +1,931 @@
+{
+  "20260514": [
+    {
+      "stk_no": "3090",
+      "stk_na": "日電貿",
+      "side": "S",
+      "price_avg": 129.5,
+      "qty": 162.0,
+      "amount": 20979.0,
+      "fee": 93.0,
+      "profit": 4869.400000000001
+    }
+  ],
+  "20260512": [
+    {
+      "stk_no": "6669",
+      "stk_na": "緯穎",
+      "side": "S",
+      "price_avg": 5790.0,
+      "qty": 2.0,
+      "amount": 11580.0,
+      "fee": 52.0,
+      "profit": 2978.0
+    }
+  ],
+  "20260504": [
+    {
+      "stk_no": "0050",
+      "stk_na": "0050",
+      "side": "S",
+      "price_avg": 94.6,
+      "qty": 183.0,
+      "amount": 17311.8,
+      "fee": 77.0,
+      "profit": 3475.8531335149846
+    },
+    {
+      "stk_no": "3532",
+      "stk_na": "台勝科",
+      "side": "S",
+      "price_avg": 207.5,
+      "qty": 124.0,
+      "amount": 25730.0,
+      "fee": 114.0,
+      "profit": 5179.000000000002
+    },
+    {
+      "stk_no": "6683",
+      "stk_na": "雍智科技",
+      "side": "S",
+      "price_avg": 2335.0,
+      "qty": 2.0,
+      "amount": 4670.0,
+      "fee": 21.0,
+      "profit": 1265.1999999999998
+    }
+  ],
+  "20260429": [
+    {
+      "stk_no": "2486",
+      "stk_na": "一詮",
+      "side": "S",
+      "price_avg": 253.5,
+      "qty": 122.0,
+      "amount": 30927.0,
+      "fee": 137.0,
+      "profit": 8263.632653061224
+    }
+  ],
+  "20260427": [
+    {
+      "stk_no": "6488",
+      "stk_na": "環球晶",
+      "side": "S",
+      "price_avg": 620.0,
+      "qty": 32.0,
+      "amount": 19840.0,
+      "fee": 88.0,
+      "profit": 4121.846153846154
+    }
+  ],
+  "20260421": [
+    {
+      "stk_no": "3264",
+      "stk_na": "欣銓",
+      "side": "S",
+      "price_avg": 206.0,
+      "qty": 100.0,
+      "amount": 20600.0,
+      "fee": 91.0,
+      "profit": 4577.114427860695
+    }
+  ],
+  "20260420": [
+    {
+      "stk_no": "5439",
+      "stk_na": "高技",
+      "side": "S",
+      "price_avg": 441.5,
+      "qty": 41.0,
+      "amount": 18101.5,
+      "fee": 80.0,
+      "profit": 4367.240963855422
+    }
+  ],
+  "20260417": [
+    {
+      "stk_no": "8358",
+      "stk_na": "金居",
+      "side": "S",
+      "price_avg": 367.5,
+      "qty": 73.0,
+      "amount": 26827.5,
+      "fee": 118.0,
+      "profit": 6431.6972789115625
+    },
+    {
+      "stk_no": "8996",
+      "stk_na": "高力",
+      "side": "S",
+      "price_avg": 1220.0,
+      "qty": 22.0,
+      "amount": 26840.0,
+      "fee": 119.0,
+      "profit": 6328.999999999999
+    }
+  ],
+  "20260410": [
+    {
+      "stk_no": "2382",
+      "stk_na": "廣達",
+      "side": "B",
+      "price_avg": 321.5,
+      "qty": 155.0,
+      "amount": 49832.5,
+      "fee": 71.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2486",
+      "stk_na": "一詮",
+      "side": "B",
+      "price_avg": 185.5,
+      "qty": 245.0,
+      "amount": 45447.5,
+      "fee": 65.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "3532",
+      "stk_na": "台勝科",
+      "side": "B",
+      "price_avg": 165.5,
+      "qty": 248.0,
+      "amount": 41044.0,
+      "fee": 58.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2489",
+      "stk_na": "瑞軒",
+      "side": "B",
+      "price_avg": 45.3,
+      "qty": 809.0,
+      "amount": 36647.7,
+      "fee": 52.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6488",
+      "stk_na": "環球晶",
+      "side": "B",
+      "price_avg": 490.5,
+      "qty": 65.0,
+      "amount": 31882.5,
+      "fee": 45.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "5439",
+      "stk_na": "高技",
+      "side": "B",
+      "price_avg": 334.5,
+      "qty": 83.0,
+      "amount": 27763.5,
+      "fee": 40.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2337",
+      "stk_na": "旺宏",
+      "side": "B",
+      "price_avg": 146.0,
+      "qty": 159.0,
+      "amount": 23214.0,
+      "fee": 33.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2376",
+      "stk_na": "技嘉",
+      "side": "B",
+      "price_avg": 262.5,
+      "qty": 71.0,
+      "amount": 18637.5,
+      "fee": 27.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6683",
+      "stk_na": "雍智科技",
+      "side": "B",
+      "price_avg": 1700.0,
+      "qty": 5.0,
+      "amount": 8500.0,
+      "fee": 12.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6937",
+      "stk_na": "天虹",
+      "side": "B",
+      "price_avg": 284.5,
+      "qty": 3.0,
+      "amount": 853.5,
+      "fee": 1.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 1472526.0499999998
+    }
+  ],
+  "20260409": [
+    {
+      "stk_no": "2368",
+      "stk_na": "金像電",
+      "side": "S",
+      "price_avg": 1095.0,
+      "qty": 13.0,
+      "amount": 14235.0,
+      "fee": 63.0,
+      "profit": 3221.1111111111118
+    }
+  ],
+  "20260407": [
+    {
+      "stk_no": "3665",
+      "stk_na": "貿聯-KY",
+      "side": "S",
+      "price_avg": 1990.0,
+      "qty": 10.0,
+      "amount": 19900.0,
+      "fee": 88.0,
+      "profit": 4528.0
+    }
+  ],
+  "20260312": [
+    {
+      "stk_no": "1785",
+      "stk_na": "光洋科",
+      "side": "S",
+      "price_avg": 83.5,
+      "qty": 113.0,
+      "amount": 9435.5,
+      "fee": 41.0,
+      "profit": 2215.6000000000004
+    },
+    {
+      "stk_no": "3167",
+      "stk_na": "大量",
+      "side": "S",
+      "price_avg": 355.0,
+      "qty": 90.0,
+      "amount": 31950.0,
+      "fee": 142.0,
+      "profit": 7119.696132596684
+    }
+  ],
+  "20260309": [
+    {
+      "stk_no": "6505",
+      "stk_na": "台塑化",
+      "side": "S",
+      "price_avg": 68.2,
+      "qty": 481.0,
+      "amount": 32804.200000000004,
+      "fee": 145.0,
+      "profit": 7804.836863966774
+    }
+  ],
+  "20260226": [
+    {
+      "stk_no": "7751",
+      "stk_na": "竑騰",
+      "side": "S",
+      "price_avg": 1215.0,
+      "qty": 19.0,
+      "amount": 23085.0,
+      "fee": 102.0,
+      "profit": 5446.666666666666
+    },
+    {
+      "stk_no": "3037",
+      "stk_na": "欣興",
+      "side": "S",
+      "price_avg": 481.5,
+      "qty": 13.0,
+      "amount": 6259.5,
+      "fee": 28.0,
+      "profit": 1423.0
+    }
+  ],
+  "20260223": [
+    {
+      "stk_no": "2308",
+      "stk_na": "台達電",
+      "side": "S",
+      "price_avg": 1305.0,
+      "qty": 13.0,
+      "amount": 16965.0,
+      "fee": 75.0,
+      "profit": 3555.9999999999986
+    }
+  ],
+  "20260210": [
+    {
+      "stk_no": "7769",
+      "stk_na": "鴻勁",
+      "side": "S",
+      "price_avg": 4000.0,
+      "qty": 4.0,
+      "amount": 16000.0,
+      "fee": 71.0,
+      "profit": 3402.0
+    },
+    {
+      "stk_no": "2345",
+      "stk_na": "智邦",
+      "side": "S",
+      "price_avg": 1390.0,
+      "qty": 4.0,
+      "amount": 5560.0,
+      "fee": 25.0,
+      "profit": 1193.7777777777774
+    },
+    {
+      "stk_no": "3167",
+      "stk_na": "大量",
+      "side": "B",
+      "price_avg": 275.5,
+      "qty": 181.0,
+      "amount": 49865.5,
+      "fee": 71.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2345",
+      "stk_na": "智邦",
+      "side": "B",
+      "price_avg": 1390.0,
+      "qty": 32.0,
+      "amount": 44480.0,
+      "fee": 63.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "8996",
+      "stk_na": "高力",
+      "side": "B",
+      "price_avg": 931.0,
+      "qty": 44.0,
+      "amount": 40964.0,
+      "fee": 58.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "7751",
+      "stk_na": "竑騰",
+      "side": "B",
+      "price_avg": 927.0,
+      "qty": 39.0,
+      "amount": 36153.0,
+      "fee": 52.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "3264",
+      "stk_na": "欣銓",
+      "side": "B",
+      "price_avg": 160.0,
+      "qty": 201.0,
+      "amount": 32160.0,
+      "fee": 46.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "0050",
+      "stk_na": "0050",
+      "side": "B",
+      "price_avg": 75.5,
+      "qty": 367.0,
+      "amount": 27708.5,
+      "fee": 39.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2368",
+      "stk_na": "金像電",
+      "side": "B",
+      "price_avg": 846.0,
+      "qty": 27.0,
+      "amount": 22842.0,
+      "fee": 33.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2890",
+      "stk_na": "永豐金",
+      "side": "B",
+      "price_avg": 30.35,
+      "qty": 622.0,
+      "amount": 18877.7,
+      "fee": 27.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2880",
+      "stk_na": "華南金",
+      "side": "B",
+      "price_avg": 34.15,
+      "qty": 422.0,
+      "amount": 14411.3,
+      "fee": 21.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "3037",
+      "stk_na": "欣興",
+      "side": "B",
+      "price_avg": 371.5,
+      "qty": 26.0,
+      "amount": 9659.0,
+      "fee": 14.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 1188299.3499999999
+    }
+  ],
+  "20260126": [
+    {
+      "stk_no": "4916",
+      "stk_na": "事欣科",
+      "side": "S",
+      "price_avg": 69.0,
+      "qty": 223.0,
+      "amount": 15387.0,
+      "fee": 68.0,
+      "profit": 3729.899999999999
+    }
+  ],
+  "20260120": [
+    {
+      "stk_no": "2330",
+      "stk_na": "台積電",
+      "side": "S",
+      "price_avg": 1775.0,
+      "qty": 16.0,
+      "amount": 28400.0,
+      "fee": 125.0,
+      "profit": 5727.5
+    }
+  ],
+  "20260114": [
+    {
+      "stk_no": "2404",
+      "stk_na": "漢唐",
+      "side": "S",
+      "price_avg": 1150.0,
+      "qty": 10.0,
+      "amount": 11500.0,
+      "fee": 50.0,
+      "profit": 2717.619047619048
+    }
+  ],
+  "20260112": [
+    {
+      "stk_no": "3105",
+      "stk_na": "穩懋",
+      "side": "S",
+      "price_avg": 233.0,
+      "qty": 144.0,
+      "amount": 33552.0,
+      "fee": 149.0,
+      "profit": 8604.622837370243
+    }
+  ],
+  "20260106": [
+    {
+      "stk_no": "3443",
+      "stk_na": "創意",
+      "side": "S",
+      "price_avg": 2485.0,
+      "qty": 6.0,
+      "amount": 14910.0,
+      "fee": 66.0,
+      "profit": 3553.9999999999995
+    }
+  ],
+  "20260105": [
+    {
+      "stk_no": "3189",
+      "stk_na": "景碩",
+      "side": "S",
+      "price_avg": 168.0,
+      "qty": 187.0,
+      "amount": 31416.0,
+      "fee": 139.0,
+      "profit": 6416.0
+    },
+    {
+      "stk_no": "2337",
+      "stk_na": "旺宏",
+      "side": "S",
+      "price_avg": 47.65,
+      "qty": 542.0,
+      "amount": 25826.3,
+      "fee": 114.0,
+      "profit": 5255.0
+    }
+  ],
+  "20251231": [
+    {
+      "stk_no": "8021",
+      "stk_na": "尖點",
+      "side": "S",
+      "price_avg": 190.0,
+      "qty": 150.0,
+      "amount": 28500.0,
+      "fee": 127.0,
+      "profit": 5742.5
+    }
+  ],
+  "20251230": [
+    {
+      "stk_no": "3260",
+      "stk_na": "威剛",
+      "side": "S",
+      "price_avg": 260.5,
+      "qty": 89.0,
+      "amount": 23184.5,
+      "fee": 103.0,
+      "profit": 4913.499999999999
+    }
+  ],
+  "20251229": [
+    {
+      "stk_no": "4989",
+      "stk_na": "榮科",
+      "side": "S",
+      "price_avg": 52.5,
+      "qty": 226.0,
+      "amount": 11865.0,
+      "fee": 53.0,
+      "profit": 2438.6298013245023
+    }
+  ],
+  "20251224": [
+    {
+      "stk_no": "4967",
+      "stk_na": "十銓",
+      "side": "S",
+      "price_avg": 162.5,
+      "qty": 57.0,
+      "amount": 9262.5,
+      "fee": 41.0,
+      "profit": 2127.586956521739
+    }
+  ],
+  "20251222": [
+    {
+      "stk_no": "8131",
+      "stk_na": "福懋科",
+      "side": "S",
+      "price_avg": 56.3,
+      "qty": 112.0,
+      "amount": 6305.599999999999,
+      "fee": 28.0,
+      "profit": 1337.031111111111
+    }
+  ],
+  "20251210": [
+    {
+      "stk_no": "3105",
+      "stk_na": "穩懋",
+      "side": "B",
+      "price_avg": 173.0,
+      "qty": 289.0,
+      "amount": 49997.0,
+      "fee": 71.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "8021",
+      "stk_na": "尖點",
+      "side": "B",
+      "price_avg": 151.5,
+      "qty": 300.0,
+      "amount": 45450.0,
+      "fee": 65.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "8358",
+      "stk_na": "金居",
+      "side": "B",
+      "price_avg": 279.0,
+      "qty": 147.0,
+      "amount": 41013.0,
+      "fee": 58.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6120",
+      "stk_na": "達運",
+      "side": "B",
+      "price_avg": 13.45,
+      "qty": 2726.0,
+      "amount": 36664.7,
+      "fee": 52.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "3090",
+      "stk_na": "日電貿",
+      "side": "B",
+      "price_avg": 99.3,
+      "qty": 324.0,
+      "amount": 32173.2,
+      "fee": 46.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "7769",
+      "stk_na": "鴻勁",
+      "side": "B",
+      "price_avg": 3145.0,
+      "qty": 8.0,
+      "amount": 25160.0,
+      "fee": 36.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "4916",
+      "stk_na": "事欣科",
+      "side": "B",
+      "price_avg": 52.2,
+      "qty": 446.0,
+      "amount": 23281.2,
+      "fee": 33.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2404",
+      "stk_na": "漢唐",
+      "side": "B",
+      "price_avg": 877.0,
+      "qty": 21.0,
+      "amount": 18417.0,
+      "fee": 26.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "1785",
+      "stk_na": "光洋科",
+      "side": "B",
+      "price_avg": 63.8,
+      "qty": 226.0,
+      "amount": 14418.8,
+      "fee": 21.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2345",
+      "stk_na": "智邦",
+      "side": "B",
+      "price_avg": 1090.0,
+      "qty": 9.0,
+      "amount": 9810.0,
+      "fee": 14.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 890754.3499999999
+    }
+  ],
+  "20251112": [
+    {
+      "stk_no": "5289",
+      "stk_na": "宜鼎",
+      "side": "S",
+      "price_avg": 523.0,
+      "qty": 40.0,
+      "amount": 20920.0,
+      "fee": 93.0,
+      "profit": 4977.5
+    }
+  ],
+  "20251110": [
+    {
+      "stk_no": "8271",
+      "stk_na": "宇瞻",
+      "side": "S",
+      "price_avg": 116.5,
+      "qty": 126.0,
+      "amount": 14679.0,
+      "fee": 65.0,
+      "profit": 3007.5
+    },
+    {
+      "stk_no": "6505",
+      "stk_na": "台塑化",
+      "side": "B",
+      "price_avg": 51.9,
+      "qty": 963.0,
+      "amount": 49979.7,
+      "fee": 71.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "8112",
+      "stk_na": "至上",
+      "side": "B",
+      "price_avg": 79.4,
+      "qty": 573.0,
+      "amount": 45496.200000000004,
+      "fee": 65.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2337",
+      "stk_na": "旺宏",
+      "side": "B",
+      "price_avg": 37.9,
+      "qty": 1084.0,
+      "amount": 41083.6,
+      "fee": 59.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "3260",
+      "stk_na": "威剛",
+      "side": "B",
+      "price_avg": 205.0,
+      "qty": 178.0,
+      "amount": 36490.0,
+      "fee": 52.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "3665",
+      "stk_na": "貿聯-KY",
+      "side": "B",
+      "price_avg": 1535.0,
+      "qty": 20.0,
+      "amount": 30700.0,
+      "fee": 44.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "3013",
+      "stk_na": "晟銘電",
+      "side": "B",
+      "price_avg": 138.0,
+      "qty": 201.0,
+      "amount": 27738.0,
+      "fee": 40.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "3443",
+      "stk_na": "創意",
+      "side": "B",
+      "price_avg": 1890.0,
+      "qty": 12.0,
+      "amount": 22680.0,
+      "fee": 32.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6669",
+      "stk_na": "緯穎",
+      "side": "B",
+      "price_avg": 4295.0,
+      "qty": 4.0,
+      "amount": 17180.0,
+      "fee": 24.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2421",
+      "stk_na": "建準",
+      "side": "B",
+      "price_avg": 176.5,
+      "qty": 81.0,
+      "amount": 14296.5,
+      "fee": 20.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "8131",
+      "stk_na": "福懋科",
+      "side": "B",
+      "price_avg": 44.3,
+      "qty": 225.0,
+      "amount": 9967.5,
+      "fee": 14.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 593947.45
+    }
+  ],
+  "20251031": [
+    {
+      "stk_no": "2360",
+      "stk_na": "致茂",
+      "side": "S",
+      "price_avg": 819.0,
+      "qty": 28.0,
+      "amount": 22932.0,
+      "fee": 102.0,
+      "profit": 4874.499999999998
+    }
+  ],
+  "20251013": [
+    {
+      "stk_no": "3189",
+      "stk_na": "景碩",
+      "side": "B",
+      "price_avg": 133.5,
+      "qty": 374.0,
+      "amount": 49929.0,
+      "fee": 71.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2330",
+      "stk_na": "台積電",
+      "side": "B",
+      "price_avg": 1415.0,
+      "qty": 32.0,
+      "amount": 45280.0,
+      "fee": 65.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "5222",
+      "stk_na": "全訊",
+      "side": "B",
+      "price_avg": 155.0,
+      "qty": 265.0,
+      "amount": 41075.0,
+      "fee": 59.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2360",
+      "stk_na": "致茂",
+      "side": "B",
+      "price_avg": 644.0,
+      "qty": 56.0,
+      "amount": 36064.0,
+      "fee": 51.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "5289",
+      "stk_na": "宜鼎",
+      "side": "B",
+      "price_avg": 398.0,
+      "qty": 80.0,
+      "amount": 31840.0,
+      "fee": 45.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2308",
+      "stk_na": "台達電",
+      "side": "B",
+      "price_avg": 1030.0,
+      "qty": 26.0,
+      "amount": 26780.0,
+      "fee": 38.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "8271",
+      "stk_na": "宇瞻",
+      "side": "B",
+      "price_avg": 92.5,
+      "qty": 252.0,
+      "amount": 23310.0,
+      "fee": 33.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "4989",
+      "stk_na": "榮科",
+      "side": "B",
+      "price_avg": 41.65,
+      "qty": 453.0,
+      "amount": 18867.45,
+      "fee": 27.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "4967",
+      "stk_na": "十銓",
+      "side": "B",
+      "price_avg": 125.0,
+      "qty": 115.0,
+      "amount": 14375.0,
+      "fee": 20.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "4953",
+      "stk_na": "緯軟",
+      "side": "B",
+      "price_avg": 129.5,
+      "qty": 77.0,
+      "amount": 9971.5,
+      "fee": 14.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 297914.95
+    }
+  ]
+}

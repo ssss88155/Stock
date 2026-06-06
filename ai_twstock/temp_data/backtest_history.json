@@ -1,0 +1,3768 @@
+{
+  "20250604": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 30000.0
+    }
+  ],
+  "20250605": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 30000.0
+    }
+  ],
+  "20250606": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 30000.0
+    }
+  ],
+  "20250609": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 30000.0
+    }
+  ],
+  "20250610": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 30000.0
+    }
+  ],
+  "20250611": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 30000.0
+    }
+  ],
+  "20250612": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 30000.0
+    }
+  ],
+  "20250613": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 30000.0
+    }
+  ],
+  "20250616": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 30000.0
+    }
+  ],
+  "20250617": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 30000.0
+    }
+  ],
+  "20250618": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 30000.0
+    }
+  ],
+  "20250619": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 30000.0
+    }
+  ],
+  "20250620": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 30000.0
+    }
+  ],
+  "20250623": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 30000.0
+    }
+  ],
+  "20250624": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 30000.0
+    }
+  ],
+  "20250625": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 30000.0
+    }
+  ],
+  "20250626": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 30000.0
+    }
+  ],
+  "20250627": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 30000.0
+    }
+  ],
+  "20250630": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 30000.0
+    }
+  ],
+  "20250701": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 75000.0
+    }
+  ],
+  "20250702": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 75000.0
+    }
+  ],
+  "20250703": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 75000.0
+    }
+  ],
+  "20250704": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 75000.0
+    }
+  ],
+  "20250707": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 75000.0
+    }
+  ],
+  "20250708": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 75000.0
+    }
+  ],
+  "20250709": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 75000.0
+    }
+  ],
+  "20250710": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 75000.0
+    }
+  ],
+  "20250711": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 75000.0
+    }
+  ],
+  "20250714": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 75000.0
+    }
+  ],
+  "20250715": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 75000.0
+    }
+  ],
+  "20250716": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 75000.0
+    }
+  ],
+  "20250717": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 75000.0
+    }
+  ],
+  "20250718": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 75000.0
+    }
+  ],
+  "20250721": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 75000.0
+    }
+  ],
+  "20250722": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 75000.0
+    }
+  ],
+  "20250723": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 75000.0
+    }
+  ],
+  "20250724": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 75000.0
+    }
+  ],
+  "20250725": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 75000.0
+    }
+  ],
+  "20250728": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 75000.0
+    }
+  ],
+  "20250729": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 75000.0
+    }
+  ],
+  "20250730": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 75000.0
+    }
+  ],
+  "20250731": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 75000.0
+    }
+  ],
+  "20250801": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 120000.0
+    }
+  ],
+  "20250804": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 120000.0
+    }
+  ],
+  "20250805": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 120000.0
+    }
+  ],
+  "20250806": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 120000.0
+    }
+  ],
+  "20250807": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 120000.0
+    }
+  ],
+  "20250808": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 120000.0
+    }
+  ],
+  "20250811": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 120000.0
+    }
+  ],
+  "20250812": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 120000.0
+    }
+  ],
+  "20250813": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 120000.0
+    }
+  ],
+  "20250814": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 120000.0
+    }
+  ],
+  "20250815": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 120000.0
+    }
+  ],
+  "20250818": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 120000.0
+    }
+  ],
+  "20250819": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 120000.0
+    }
+  ],
+  "20250821": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 120000.0
+    }
+  ],
+  "20250825": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 120000.0
+    }
+  ],
+  "20250826": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 120000.0
+    }
+  ],
+  "20250827": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 120000.0
+    }
+  ],
+  "20250828": [
+    {
+      "stk_no": "00981A",
+      "stk_na": "00981A",
+      "side": "B",
+      "price_avg": 13.3,
+      "qty": 1353.0,
+      "amount": 17994.9,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 120067.65000000001
+    }
+  ],
+  "20250829": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 120392.37000000001
+    }
+  ],
+  "20250901": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 164715.87
+    }
+  ],
+  "20250902": [
+    {
+      "stk_no": "00981A",
+      "stk_na": "00981A",
+      "side": "S",
+      "price_avg": 12.95,
+      "qty": 1353.0,
+      "amount": 17521.35,
+      "fee": 79.0,
+      "profit": -473.55000000000194
+    }
+  ],
+  "20250905": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 164447.45
+    }
+  ],
+  "20250908": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 164447.45
+    }
+  ],
+  "20250909": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 164447.45
+    }
+  ],
+  "20250910": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 164447.45
+    }
+  ],
+  "20250911": [
+    {
+      "stk_no": "00981A",
+      "stk_na": "00981A",
+      "side": "B",
+      "price_avg": 14.01,
+      "qty": 1760.0,
+      "amount": 24657.6,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 164095.45
+    }
+  ],
+  "20250912": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 163954.65
+    }
+  ],
+  "20250915": [
+    {
+      "stk_no": "00981A",
+      "stk_na": "00981A",
+      "side": "S",
+      "price_avg": 13.589699999999999,
+      "qty": 1760.0,
+      "amount": 23917.872,
+      "fee": 108.0,
+      "profit": -739.7280000000018,
+      "invested_capital_snapshot": 163599.722
+    }
+  ],
+  "20250916": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 163599.722
+    }
+  ],
+  "20250917": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 163599.722
+    }
+  ],
+  "20250918": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 163599.722
+    }
+  ],
+  "20250919": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 163599.722
+    }
+  ],
+  "20250922": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 163599.722
+    }
+  ],
+  "20250923": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 163599.722
+    }
+  ],
+  "20250924": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 163599.722
+    }
+  ],
+  "20250925": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 163599.722
+    }
+  ],
+  "20250926": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 163599.722
+    }
+  ],
+  "20250930": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 163599.722
+    }
+  ],
+  "20251001": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 208599.722
+    }
+  ],
+  "20251002": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 208599.722
+    }
+  ],
+  "20251003": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 208599.722
+    }
+  ],
+  "20251007": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 208599.722
+    }
+  ],
+  "20251008": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 208599.722
+    }
+  ],
+  "20251009": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 208599.722
+    }
+  ],
+  "20251013": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 208599.722
+    }
+  ],
+  "20251014": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 208599.722
+    }
+  ],
+  "20251015": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 208599.722
+    }
+  ],
+  "20251016": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 208599.722
+    }
+  ],
+  "20251017": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 208599.722
+    }
+  ],
+  "20251020": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 208599.722
+    }
+  ],
+  "20251021": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 208599.722
+    }
+  ],
+  "20251022": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 208599.722
+    }
+  ],
+  "20251023": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 208599.722
+    }
+  ],
+  "20251027": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 208599.722
+    }
+  ],
+  "20251028": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 208599.722
+    }
+  ],
+  "20251029": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 208599.722
+    }
+  ],
+  "20251030": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 208599.722
+    }
+  ],
+  "20251031": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 208599.722
+    }
+  ],
+  "20251103": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 253599.722
+    }
+  ],
+  "20251104": [
+    {
+      "stk_no": "00981A",
+      "stk_na": "00981A",
+      "side": "B",
+      "price_avg": 16.06,
+      "qty": 2368.0,
+      "amount": 38030.079999999994,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 252770.92200000002
+    }
+  ],
+  "20251105": [
+    {
+      "stk_no": "00981A",
+      "stk_na": "00981A",
+      "side": "S",
+      "price_avg": 15.578199999999999,
+      "qty": 2368.0,
+      "amount": 36889.177599999995,
+      "fee": 166.0,
+      "profit": -1140.9023999999995,
+      "invested_capital_snapshot": 252292.81960000002
+    }
+  ],
+  "20251106": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 252292.81960000002
+    }
+  ],
+  "20251107": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 252292.81960000002
+    }
+  ],
+  "20251110": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 252292.81960000002
+    }
+  ],
+  "20251111": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 252292.81960000002
+    }
+  ],
+  "20251112": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 252292.81960000002
+    }
+  ],
+  "20251113": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 252292.81960000002
+    }
+  ],
+  "20251120": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 252292.81960000002
+    }
+  ],
+  "20251126": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 252292.81960000002
+    }
+  ],
+  "20251127": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 252292.81960000002
+    }
+  ],
+  "20251128": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 252292.81960000002
+    }
+  ],
+  "20251201": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 297292.81960000005
+    }
+  ],
+  "20251202": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 297292.81960000005
+    }
+  ],
+  "20251203": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 297292.81960000005
+    }
+  ],
+  "20251204": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 297292.81960000005
+    }
+  ],
+  "20251205": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 297292.81960000005
+    }
+  ],
+  "20251208": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 297292.81960000005
+    }
+  ],
+  "20251209": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 297292.81960000005
+    }
+  ],
+  "20251210": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 297292.81960000005
+    }
+  ],
+  "20251211": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 297292.81960000005
+    }
+  ],
+  "20251212": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 297292.81960000005
+    }
+  ],
+  "20251215": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 297292.81960000005
+    }
+  ],
+  "20251216": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 297292.81960000005
+    }
+  ],
+  "20251219": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 297292.81960000005
+    }
+  ],
+  "20251222": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 297292.81960000005
+    }
+  ],
+  "20251223": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 297292.81960000005
+    }
+  ],
+  "20251224": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 297292.81960000005
+    }
+  ],
+  "20251226": [
+    {
+      "stk_no": "00981A",
+      "stk_na": "00981A",
+      "side": "B",
+      "price_avg": 16.62,
+      "qty": 2683.0,
+      "amount": 44591.46,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 297641.6096000001
+    }
+  ],
+  "20251229": [
+    {
+      "stk_no": "00981A",
+      "stk_na": "00981A",
+      "side": "S",
+      "price_avg": 16.82,
+      "qty": 2683.0,
+      "amount": 45128.06,
+      "fee": 203.0,
+      "profit": 536.5999999999981,
+      "invested_capital_snapshot": 297626.4196
+    }
+  ],
+  "20251230": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 297626.4196
+    }
+  ],
+  "20251231": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 297626.4196
+    }
+  ],
+  "20260102": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 342626.4196
+    }
+  ],
+  "20260105": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 342626.4196
+    }
+  ],
+  "20260106": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 342626.4196
+    }
+  ],
+  "20260107": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 342626.4196
+    }
+  ],
+  "20260108": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 342626.4196
+    }
+  ],
+  "20260109": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 342626.4196
+    }
+  ],
+  "20260112": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 342626.4196
+    }
+  ],
+  "20260113": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 342626.4196
+    }
+  ],
+  "20260114": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 342626.4196
+    }
+  ],
+  "20260115": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 342626.4196
+    }
+  ],
+  "20260116": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 342626.4196
+    }
+  ],
+  "20260119": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 342626.4196
+    }
+  ],
+  "20260120": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 342626.4196
+    }
+  ],
+  "20260121": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 342626.4196
+    }
+  ],
+  "20260122": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 342626.4196
+    }
+  ],
+  "20260123": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 342626.4196
+    }
+  ],
+  "20260126": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 342626.4196
+    }
+  ],
+  "20260127": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 342626.4196
+    }
+  ],
+  "20260128": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 342626.4196
+    }
+  ],
+  "20260129": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 342626.4196
+    }
+  ],
+  "20260130": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 342626.4196
+    }
+  ],
+  "20260203": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 387626.4196
+    }
+  ],
+  "20260204": [
+    {
+      "stk_no": "00981A",
+      "stk_na": "00981A",
+      "side": "B",
+      "price_avg": 18.25,
+      "qty": 3185.0,
+      "amount": 58126.25,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 388677.4696
+    }
+  ],
+  "20260205": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 387276.06960000005
+    }
+  ],
+  "20260206": [
+    {
+      "stk_no": "00981A",
+      "stk_na": "00981A",
+      "side": "S",
+      "price_avg": 17.82,
+      "qty": 3185.0,
+      "amount": 56756.700000000004,
+      "fee": 255.0,
+      "profit": -1369.549999999999
+    }
+  ],
+  "20260209": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 386001.86960000003
+    }
+  ],
+  "20260210": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 386001.86960000003
+    }
+  ],
+  "20260211": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 386001.86960000003
+    }
+  ],
+  "20260223": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 386001.86960000003
+    }
+  ],
+  "20260224": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 386001.86960000003
+    }
+  ],
+  "20260225": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 386001.86960000003
+    }
+  ],
+  "20260226": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 386001.86960000003
+    }
+  ],
+  "20260302": [
+    {
+      "stk_no": "00981A",
+      "stk_na": "00981A",
+      "side": "B",
+      "price_avg": 19.68,
+      "qty": 3285.0,
+      "amount": 64648.799999999996,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 432348.71960000007
+    }
+  ],
+  "20260303": [
+    {
+      "stk_no": "00981A",
+      "stk_na": "00981A",
+      "side": "S",
+      "price_avg": 19.8,
+      "qty": 3285.0,
+      "amount": 65043.0,
+      "fee": 293.0,
+      "profit": 394.2000000000033,
+      "invested_capital_snapshot": 431103.06960000005
+    }
+  ],
+  "20260304": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 431103.06960000005
+    }
+  ],
+  "20260305": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 431103.06960000005
+    }
+  ],
+  "20260306": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 431103.06960000005
+    }
+  ],
+  "20260311": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 431103.06960000005
+    }
+  ],
+  "20260312": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 431103.06960000005
+    }
+  ],
+  "20260313": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 431103.06960000005
+    }
+  ],
+  "20260316": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 431103.06960000005
+    }
+  ],
+  "20260317": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 431103.06960000005
+    }
+  ],
+  "20260318": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 431103.06960000005
+    }
+  ],
+  "20260319": [
+    {
+      "stk_no": "00981A",
+      "stk_na": "00981A",
+      "side": "B",
+      "price_avg": 20.66,
+      "qty": 3129.0,
+      "amount": 64645.14,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 432292.08960000006
+    }
+  ],
+  "20260320": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 432229.50960000005
+    }
+  ],
+  "20260323": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 430101.7896
+    }
+  ],
+  "20260324": [
+    {
+      "stk_no": "00981A",
+      "stk_na": "00981A",
+      "side": "S",
+      "price_avg": 20.0402,
+      "qty": 3129.0,
+      "amount": 62705.7858,
+      "fee": 282.0,
+      "profit": -1939.3542000000045
+    }
+  ],
+  "20260325": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 428881.71540000004
+    }
+  ],
+  "20260326": [
+    {
+      "stk_no": "00981A",
+      "stk_na": "00981A",
+      "side": "B",
+      "price_avg": 20.96,
+      "qty": 3069.0,
+      "amount": 64326.240000000005,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "00992A",
+      "stk_na": "00992A",
+      "side": "B",
+      "price_avg": 13.75,
+      "qty": 4678.0,
+      "amount": 64322.5,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 427916.91540000006
+    }
+  ],
+  "20260327": [
+    {
+      "stk_no": "00992A",
+      "stk_na": "00992A",
+      "side": "S",
+      "price_avg": 13.48,
+      "qty": 4678.0,
+      "amount": 63059.44,
+      "fee": 284.0,
+      "profit": -1263.059999999998,
+      "invested_capital_snapshot": 426966.3754000001
+    }
+  ],
+  "20260330": [
+    {
+      "stk_no": "00981A",
+      "stk_na": "00981A",
+      "side": "S",
+      "price_avg": 20.45,
+      "qty": 3069.0,
+      "amount": 62761.049999999996,
+      "fee": 282.0,
+      "profit": -1565.1900000000048
+    }
+  ],
+  "20260401": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 470487.46540000004
+    }
+  ],
+  "20260407": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 470487.46540000004
+    }
+  ],
+  "20260408": [
+    {
+      "stk_no": "00992A",
+      "stk_na": "00992A",
+      "side": "B",
+      "price_avg": 14.16,
+      "qty": 4983.0,
+      "amount": 70559.28,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 471633.55540000007
+    }
+  ],
+  "20260409": [
+    {
+      "stk_no": "00981A",
+      "stk_na": "00981A",
+      "side": "B",
+      "price_avg": 22.4,
+      "qty": 3160.0,
+      "amount": 70784.0,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 472551.16540000006
+    }
+  ],
+  "20260410": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 476531.5154000001
+    }
+  ],
+  "20260413": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 476365.0054000001
+    }
+  ],
+  "20260414": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 479026.6854000001
+    }
+  ],
+  "20260415": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 482271.7454000001
+    }
+  ],
+  "20260416": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 486498.8254000001
+    }
+  ],
+  "20260417": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 488536.9954000001
+    }
+  ],
+  "20260420": [
+    {
+      "stk_no": "00992A",
+      "stk_na": "00992A",
+      "side": "S",
+      "price_avg": 16.79,
+      "qty": 2491.0,
+      "amount": 41823.89,
+      "fee": 188.0,
+      "profit": 6551.329999999997,
+      "invested_capital_snapshot": 494717.55540000007
+    }
+  ],
+  "20260421": [
+    {
+      "stk_no": "00981A",
+      "stk_na": "00981A",
+      "side": "S",
+      "price_avg": 26.4,
+      "qty": 1580.0,
+      "amount": 41712.0,
+      "fee": 188.0,
+      "profit": 6320.0,
+      "invested_capital_snapshot": 496056.1154000001
+    }
+  ],
+  "20260422": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 497398.5954000001
+    }
+  ],
+  "20260423": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 495880.3954000001
+    }
+  ],
+  "20260424": [
+    {
+      "stk_no": "00992A",
+      "stk_na": "00992A",
+      "side": "S",
+      "price_avg": 16.93,
+      "qty": 2492.0,
+      "amount": 42189.56,
+      "fee": 190.0,
+      "profit": 6902.839999999999,
+      "invested_capital_snapshot": 498227.6354000001
+    }
+  ],
+  "20260427": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 498385.6354000001
+    }
+  ],
+  "20260428": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 498243.4354000001
+    }
+  ],
+  "20260429": [
+    {
+      "stk_no": "00981A",
+      "stk_na": "00981A",
+      "side": "S",
+      "price_avg": 27.74,
+      "qty": 1580.0,
+      "amount": 43829.2,
+      "fee": 197.0,
+      "profit": 8437.199999999999,
+      "invested_capital_snapshot": 497935.8354000001
+    }
+  ],
+  "20260430": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 497935.8354000001
+    }
+  ],
+  "20260504": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 542935.8354000001
+    }
+  ],
+  "20260505": [
+    {
+      "stk_no": "00992A",
+      "stk_na": "00992A",
+      "side": "B",
+      "price_avg": 18.04,
+      "qty": 4514.0,
+      "amount": 81432.56,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "00981A",
+      "stk_na": "00981A",
+      "side": "B",
+      "price_avg": 29.74,
+      "qty": 2738.0,
+      "amount": 81428.12,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 542078.9154
+    }
+  ],
+  "20260506": [
+    {
+      "stk_no": "CASH",
+      "stk_na": "現金",
+      "side": "INFO",
+      "invested_capital_snapshot": 541550.5554000002
+    }
+  ],
+  "20260507": [
+    {
+      "stk_no": "00981A",
+      "stk_na": "00981A",
+      "side": "S",
+      "price_avg": 29.58,
+      "qty": 2738.0,
+      "amount": 80990.04,
+      "fee": 364.0,
+      "profit": -438.0800000000004
+    },
+    {
+      "stk_no": "00992A",
+      "stk_na": "00992A",
+      "side": "S",
+      "price_avg": 18.04,
+      "qty": 4514.0,
+      "amount": 81432.56,
+      "fee": 366.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6488",
+      "stk_na": "環球晶",
+      "side": "B",
+      "price_avg": 720.0,
+      "qty": 112.0,
+      "amount": 80640.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "8150",
+      "stk_na": "南茂",
+      "side": "B",
+      "price_avg": 90.0,
+      "qty": 902.0,
+      "amount": 81180.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "3532",
+      "stk_na": "台勝科",
+      "side": "B",
+      "price_avg": 250.5,
+      "qty": 324.0,
+      "amount": 81162.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "3026",
+      "stk_na": "禾伸堂",
+      "side": "B",
+      "price_avg": 300.0,
+      "qty": 270.0,
+      "amount": 81000.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2454",
+      "stk_na": "聯發科",
+      "side": "B",
+      "price_avg": 3430.0,
+      "qty": 23.0,
+      "amount": 78890.0,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 561069.9554000001
+    }
+  ],
+  "20260508": [
+    {
+      "stk_no": "8150",
+      "stk_na": "南茂",
+      "side": "S",
+      "price_avg": 92.7,
+      "qty": 902.0,
+      "amount": 83615.40000000001,
+      "fee": 376.0,
+      "profit": 2435.4000000000024
+    },
+    {
+      "stk_no": "6526",
+      "stk_na": "達發",
+      "side": "B",
+      "price_avg": 750.0,
+      "qty": 59.0,
+      "amount": 44250.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2308",
+      "stk_na": "台達電",
+      "side": "B",
+      "price_avg": 2230.0,
+      "qty": 19.0,
+      "amount": 42370.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2327",
+      "stk_na": "國巨*",
+      "side": "B",
+      "price_avg": 390.0,
+      "qty": 113.0,
+      "amount": 44070.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "7769",
+      "stk_na": "鴻勁",
+      "side": "B",
+      "price_avg": 5885.0,
+      "qty": 7.0,
+      "amount": 41195.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "3450",
+      "stk_na": "聯鈞",
+      "side": "B",
+      "price_avg": 376.0,
+      "qty": 118.0,
+      "amount": 44368.0,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 570890.1554000002
+    }
+  ],
+  "20260511": [
+    {
+      "stk_no": "4966",
+      "stk_na": "譜瑞-KY",
+      "side": "B",
+      "price_avg": 700.0,
+      "qty": 1.0,
+      "amount": 700.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "3526",
+      "stk_na": "凡甲",
+      "side": "B",
+      "price_avg": 390.0,
+      "qty": 3.0,
+      "amount": 1170.0,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 590776.6554000002
+    }
+  ],
+  "20260512": [
+    {
+      "stk_no": "2327",
+      "stk_na": "國巨*",
+      "side": "S",
+      "price_avg": 419.5,
+      "qty": 113.0,
+      "amount": 47403.5,
+      "fee": 213.0,
+      "profit": 3333.5
+    },
+    {
+      "stk_no": "7769",
+      "stk_na": "鴻勁",
+      "side": "S",
+      "price_avg": 6870.0,
+      "qty": 3.0,
+      "amount": 20610.0,
+      "fee": 93.0,
+      "profit": 2955.0
+    },
+    {
+      "stk_no": "3450",
+      "stk_na": "聯鈞",
+      "side": "S",
+      "price_avg": 470.5,
+      "qty": 59.0,
+      "amount": 27759.5,
+      "fee": 125.0,
+      "profit": 5575.5
+    },
+    {
+      "stk_no": "4966",
+      "stk_na": "譜瑞-KY",
+      "side": "S",
+      "price_avg": 761.0,
+      "qty": 1.0,
+      "amount": 761.0,
+      "fee": 3.0,
+      "profit": 61.0
+    },
+    {
+      "stk_no": "2059",
+      "stk_na": "川湖",
+      "side": "B",
+      "price_avg": 5450.0,
+      "qty": 3.0,
+      "amount": 16350.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "4749",
+      "stk_na": "新應材",
+      "side": "B",
+      "price_avg": 1175.0,
+      "qty": 17.0,
+      "amount": 19975.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "4919",
+      "stk_na": "新唐",
+      "side": "B",
+      "price_avg": 186.0,
+      "qty": 107.0,
+      "amount": 19902.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "5483",
+      "stk_na": "中美晶",
+      "side": "B",
+      "price_avg": 167.0,
+      "qty": 119.0,
+      "amount": 19873.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "8210",
+      "stk_na": "勤誠",
+      "side": "B",
+      "price_avg": 1505.0,
+      "qty": 13.0,
+      "amount": 19565.0,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 587962.1554000002
+    }
+  ],
+  "20260513": [
+    {
+      "stk_no": "6488",
+      "stk_na": "環球晶",
+      "side": "S",
+      "price_avg": 768.2,
+      "qty": 112.0,
+      "amount": 86038.40000000001,
+      "fee": 387.0,
+      "profit": 5398.400000000005
+    },
+    {
+      "stk_no": "3532",
+      "stk_na": "台勝科",
+      "side": "S",
+      "price_avg": 246.56,
+      "qty": 324.0,
+      "amount": 79885.44,
+      "fee": 360.0,
+      "profit": -1276.5599999999993
+    },
+    {
+      "stk_no": "2454",
+      "stk_na": "聯發科",
+      "side": "S",
+      "price_avg": 3569.6000000000004,
+      "qty": 23.0,
+      "amount": 82100.8,
+      "fee": 369.0,
+      "profit": 3210.8000000000084
+    },
+    {
+      "stk_no": "6526",
+      "stk_na": "達發",
+      "side": "S",
+      "price_avg": 727.5,
+      "qty": 59.0,
+      "amount": 42922.5,
+      "fee": 193.0,
+      "profit": -1327.5
+    },
+    {
+      "stk_no": "2308",
+      "stk_na": "台達電",
+      "side": "S",
+      "price_avg": 2165.0,
+      "qty": 19.0,
+      "amount": 41135.0,
+      "fee": 185.0,
+      "profit": -1235.0
+    },
+    {
+      "stk_no": "2059",
+      "stk_na": "川湖",
+      "side": "S",
+      "price_avg": 5286.5,
+      "qty": 3.0,
+      "amount": 15859.5,
+      "fee": 72.0,
+      "profit": -490.5
+    },
+    {
+      "stk_no": "4749",
+      "stk_na": "新應材",
+      "side": "S",
+      "price_avg": 1139.75,
+      "qty": 17.0,
+      "amount": 19375.75,
+      "fee": 87.0,
+      "profit": -599.25
+    },
+    {
+      "stk_no": "4919",
+      "stk_na": "新唐",
+      "side": "S",
+      "price_avg": 180.42,
+      "qty": 107.0,
+      "amount": 19304.94,
+      "fee": 87.0,
+      "profit": -597.0600000000013
+    },
+    {
+      "stk_no": "5483",
+      "stk_na": "中美晶",
+      "side": "S",
+      "price_avg": 161.99,
+      "qty": 119.0,
+      "amount": 19276.81,
+      "fee": 87.0,
+      "profit": -596.1899999999989
+    },
+    {
+      "stk_no": "8210",
+      "stk_na": "勤誠",
+      "side": "S",
+      "price_avg": 1520.0,
+      "qty": 13.0,
+      "amount": 19760.0,
+      "fee": 89.0,
+      "profit": 195.0
+    },
+    {
+      "stk_no": "4966",
+      "stk_na": "譜瑞-KY",
+      "side": "B",
+      "price_avg": 780.0,
+      "qty": 109.0,
+      "amount": 85020.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "5269",
+      "stk_na": "祥碩",
+      "side": "B",
+      "price_avg": 1490.0,
+      "qty": 57.0,
+      "amount": 84930.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "8069",
+      "stk_na": "元太",
+      "side": "B",
+      "price_avg": 208.0,
+      "qty": 411.0,
+      "amount": 85488.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2303",
+      "stk_na": "聯電",
+      "side": "B",
+      "price_avg": 102.0,
+      "qty": 839.0,
+      "amount": 85578.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2408",
+      "stk_na": "南亞科",
+      "side": "B",
+      "price_avg": 311.5,
+      "qty": 274.0,
+      "amount": 85351.0,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 575086.8954000002
+    }
+  ],
+  "20260514": [
+    {
+      "stk_no": "3026",
+      "stk_na": "禾伸堂",
+      "side": "S",
+      "price_avg": 357.5,
+      "qty": 135.0,
+      "amount": 48262.5,
+      "fee": 217.0,
+      "profit": 7762.5
+    },
+    {
+      "stk_no": "3450",
+      "stk_na": "聯鈞",
+      "side": "S",
+      "price_avg": 432.86,
+      "qty": 59.0,
+      "amount": 25538.74,
+      "fee": 115.0,
+      "profit": 3354.7400000000007
+    },
+    {
+      "stk_no": "5269",
+      "stk_na": "祥碩",
+      "side": "S",
+      "price_avg": 1465.0,
+      "qty": 57.0,
+      "amount": 83505.0,
+      "fee": 376.0,
+      "profit": -1425.0
+    },
+    {
+      "stk_no": "8069",
+      "stk_na": "元太",
+      "side": "S",
+      "price_avg": 226.0,
+      "qty": 411.0,
+      "amount": 92886.0,
+      "fee": 418.0,
+      "profit": 7398.0
+    },
+    {
+      "stk_no": "2303",
+      "stk_na": "聯電",
+      "side": "S",
+      "price_avg": 108.0,
+      "qty": 839.0,
+      "amount": 90612.0,
+      "fee": 408.0,
+      "profit": 5034.0
+    },
+    {
+      "stk_no": "2408",
+      "stk_na": "南亞科",
+      "side": "S",
+      "price_avg": 341.0,
+      "qty": 274.0,
+      "amount": 93434.0,
+      "fee": 420.0,
+      "profit": 8083.0
+    },
+    {
+      "stk_no": "2492",
+      "stk_na": "華新科",
+      "side": "B",
+      "price_avg": 220.0,
+      "qty": 394.0,
+      "amount": 86680.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "3624",
+      "stk_na": "光頡",
+      "side": "B",
+      "price_avg": 72.9,
+      "qty": 1190.0,
+      "amount": 86751.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6531",
+      "stk_na": "愛普*",
+      "side": "B",
+      "price_avg": 1115.0,
+      "qty": 77.0,
+      "amount": 85855.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6831",
+      "stk_na": "邁科",
+      "side": "B",
+      "price_avg": 733.0,
+      "qty": 118.0,
+      "amount": 86494.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6719",
+      "stk_na": "力智",
+      "side": "B",
+      "price_avg": 204.5,
+      "qty": 424.0,
+      "amount": 86708.0,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 598789.0354000002
+    }
+  ],
+  "20260515": [
+    {
+      "stk_no": "3026",
+      "stk_na": "禾伸堂",
+      "side": "S",
+      "price_avg": 328.90000000000003,
+      "qty": 135.0,
+      "amount": 44401.50000000001,
+      "fee": 200.0,
+      "profit": 3901.5000000000045
+    },
+    {
+      "stk_no": "7769",
+      "stk_na": "鴻勁",
+      "side": "S",
+      "price_avg": 6955.200000000001,
+      "qty": 4.0,
+      "amount": 27820.800000000003,
+      "fee": 125.0,
+      "profit": 4280.800000000003
+    },
+    {
+      "stk_no": "3526",
+      "stk_na": "凡甲",
+      "side": "S",
+      "price_avg": 378.3,
+      "qty": 3.0,
+      "amount": 1134.9,
+      "fee": 5.0,
+      "profit": -35.099999999999966
+    },
+    {
+      "stk_no": "2492",
+      "stk_na": "華新科",
+      "side": "S",
+      "price_avg": 213.4,
+      "qty": 394.0,
+      "amount": 84079.6,
+      "fee": 378.0,
+      "profit": -2600.399999999998
+    },
+    {
+      "stk_no": "6531",
+      "stk_na": "愛普*",
+      "side": "S",
+      "price_avg": 1081.55,
+      "qty": 77.0,
+      "amount": 83279.34999999999,
+      "fee": 375.0,
+      "profit": -2575.6500000000033
+    },
+    {
+      "stk_no": "2344",
+      "stk_na": "華邦電",
+      "side": "B",
+      "price_avg": 132.5,
+      "qty": 364.0,
+      "amount": 48230.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "8028",
+      "stk_na": "昇陽半導體",
+      "side": "B",
+      "price_avg": 264.0,
+      "qty": 182.0,
+      "amount": 48048.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6415",
+      "stk_na": "矽力*-KY",
+      "side": "B",
+      "price_avg": 490.5,
+      "qty": 98.0,
+      "amount": 48069.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2408",
+      "stk_na": "南亞科",
+      "side": "B",
+      "price_avg": 330.5,
+      "qty": 145.0,
+      "amount": 47922.5,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2303",
+      "stk_na": "聯電",
+      "side": "B",
+      "price_avg": 112.0,
+      "qty": 430.0,
+      "amount": 48160.0,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 586845.6854000002
+    }
+  ],
+  "20260518": [
+    {
+      "stk_no": "2408",
+      "stk_na": "南亞科",
+      "side": "S",
+      "price_avg": 320.585,
+      "qty": 145.0,
+      "amount": 46484.825,
+      "fee": 209.0,
+      "profit": -1437.675000000003
+    },
+    {
+      "stk_no": "6719",
+      "stk_na": "力智",
+      "side": "S",
+      "price_avg": 220.0,
+      "qty": 424.0,
+      "amount": 93280.0,
+      "fee": 420.0,
+      "profit": 6572.0
+    },
+    {
+      "stk_no": "2327",
+      "stk_na": "國巨*",
+      "side": "B",
+      "price_avg": 475.0,
+      "qty": 58.0,
+      "amount": 27550.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "5347",
+      "stk_na": "世界",
+      "side": "B",
+      "price_avg": 159.0,
+      "qty": 176.0,
+      "amount": 27984.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "3090",
+      "stk_na": "日電貿",
+      "side": "B",
+      "price_avg": 141.5,
+      "qty": 197.0,
+      "amount": 27875.5,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6789",
+      "stk_na": "采鈺",
+      "side": "B",
+      "price_avg": 578.0,
+      "qty": 48.0,
+      "amount": 27744.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "3583",
+      "stk_na": "辛耘",
+      "side": "B",
+      "price_avg": 868.0,
+      "qty": 32.0,
+      "amount": 27776.0,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 607281.5104000003
+    }
+  ],
+  "20260519": [
+    {
+      "stk_no": "2327",
+      "stk_na": "國巨*",
+      "side": "S",
+      "price_avg": 497.0,
+      "qty": 58.0,
+      "amount": 28826.0,
+      "fee": 129.0,
+      "profit": 1276.0
+    },
+    {
+      "stk_no": "4966",
+      "stk_na": "譜瑞-KY",
+      "side": "S",
+      "price_avg": 756.6,
+      "qty": 109.0,
+      "amount": 82469.40000000001,
+      "fee": 371.0,
+      "profit": -2550.5999999999976
+    },
+    {
+      "stk_no": "2303",
+      "stk_na": "聯電",
+      "side": "S",
+      "price_avg": 113.0,
+      "qty": 430.0,
+      "amount": 48590.0,
+      "fee": 219.0,
+      "profit": 430.0
+    },
+    {
+      "stk_no": "3624",
+      "stk_na": "光頡",
+      "side": "S",
+      "price_avg": 91.2,
+      "qty": 1190.0,
+      "amount": 108528.0,
+      "fee": 489.0,
+      "profit": 21776.999999999996
+    },
+    {
+      "stk_no": "2344",
+      "stk_na": "華邦電",
+      "side": "S",
+      "price_avg": 128.525,
+      "qty": 364.0,
+      "amount": 46783.1,
+      "fee": 210.0,
+      "profit": -1446.8999999999978
+    },
+    {
+      "stk_no": "3090",
+      "stk_na": "日電貿",
+      "side": "S",
+      "price_avg": 162.5,
+      "qty": 197.0,
+      "amount": 32012.5,
+      "fee": 144.0,
+      "profit": 4137.0
+    },
+    {
+      "stk_no": "6789",
+      "stk_na": "采鈺",
+      "side": "S",
+      "price_avg": 560.66,
+      "qty": 48.0,
+      "amount": 26911.68,
+      "fee": 121.0,
+      "profit": -832.3200000000015
+    },
+    {
+      "stk_no": "3583",
+      "stk_na": "辛耘",
+      "side": "S",
+      "price_avg": 842.0,
+      "qty": 32.0,
+      "amount": 26944.0,
+      "fee": 121.0,
+      "profit": -832.0
+    },
+    {
+      "stk_no": "6147",
+      "stk_na": "頎邦",
+      "side": "B",
+      "price_avg": 211.0,
+      "qty": 379.0,
+      "amount": 79969.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "3526",
+      "stk_na": "凡甲",
+      "side": "B",
+      "price_avg": 368.5,
+      "qty": 217.0,
+      "amount": 79964.5,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "7734",
+      "stk_na": "印能科技",
+      "side": "B",
+      "price_avg": 3860.0,
+      "qty": 20.0,
+      "amount": 77200.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "3189",
+      "stk_na": "景碩",
+      "side": "B",
+      "price_avg": 515.0,
+      "qty": 155.0,
+      "amount": 79825.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2472",
+      "stk_na": "立隆電",
+      "side": "B",
+      "price_avg": 235.0,
+      "qty": 340.0,
+      "amount": 79900.0,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 592202.6904000002
+    }
+  ],
+  "20260520": [
+    {
+      "stk_no": "3526",
+      "stk_na": "凡甲",
+      "side": "S",
+      "price_avg": 357.445,
+      "qty": 217.0,
+      "amount": 77565.565,
+      "fee": 349.0,
+      "profit": -2398.9350000000013
+    },
+    {
+      "stk_no": "5347",
+      "stk_na": "世界",
+      "side": "S",
+      "price_avg": 159.0,
+      "qty": 176.0,
+      "amount": 27984.0,
+      "fee": 126.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6147",
+      "stk_na": "頎邦",
+      "side": "S",
+      "price_avg": 215.5,
+      "qty": 379.0,
+      "amount": 81674.5,
+      "fee": 368.0,
+      "profit": 1705.5
+    },
+    {
+      "stk_no": "7734",
+      "stk_na": "印能科技",
+      "side": "S",
+      "price_avg": 3744.2,
+      "qty": 20.0,
+      "amount": 74884.0,
+      "fee": 337.0,
+      "profit": -2316.0000000000036
+    }
+  ],
+  "20260521": [
+    {
+      "stk_no": "6415",
+      "stk_na": "矽力*-KY",
+      "side": "S",
+      "price_avg": 557.0,
+      "qty": 98.0,
+      "amount": 54586.0,
+      "fee": 246.0,
+      "profit": 6517.0
+    },
+    {
+      "stk_no": "3189",
+      "stk_na": "景碩",
+      "side": "S",
+      "price_avg": 554.0,
+      "qty": 155.0,
+      "amount": 85870.0,
+      "fee": 387.0,
+      "profit": 6045.0
+    },
+    {
+      "stk_no": "5425",
+      "stk_na": "台半",
+      "side": "B",
+      "price_avg": 90.6,
+      "qty": 892.0,
+      "amount": 80815.2,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "3675",
+      "stk_na": "德微",
+      "side": "B",
+      "price_avg": 324.0,
+      "qty": 249.0,
+      "amount": 80676.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "4958",
+      "stk_na": "臻鼎-KY",
+      "side": "B",
+      "price_avg": 463.5,
+      "qty": 174.0,
+      "amount": 80649.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "3026",
+      "stk_na": "禾伸堂",
+      "side": "B",
+      "price_avg": 428.0,
+      "qty": 188.0,
+      "amount": 80464.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6412",
+      "stk_na": "群電",
+      "side": "B",
+      "price_avg": 96.0,
+      "qty": 842.0,
+      "amount": 80832.0,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 636424.0554000002
+    }
+  ],
+  "20260522": [
+    {
+      "stk_no": "6831",
+      "stk_na": "邁科",
+      "side": "S",
+      "price_avg": 786.0,
+      "qty": 118.0,
+      "amount": 92748.0,
+      "fee": 417.0,
+      "profit": 6254.0
+    },
+    {
+      "stk_no": "8028",
+      "stk_na": "昇陽半導體",
+      "side": "S",
+      "price_avg": 294.0,
+      "qty": 182.0,
+      "amount": 53508.0,
+      "fee": 241.0,
+      "profit": 5460.0
+    },
+    {
+      "stk_no": "5425",
+      "stk_na": "台半",
+      "side": "S",
+      "price_avg": 87.88199999999999,
+      "qty": 892.0,
+      "amount": 78390.74399999999,
+      "fee": 353.0,
+      "profit": -2424.4560000000033
+    },
+    {
+      "stk_no": "3090",
+      "stk_na": "日電貿",
+      "side": "B",
+      "price_avg": 196.0,
+      "qty": 228.0,
+      "amount": 44688.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6706",
+      "stk_na": "惠特",
+      "side": "B",
+      "price_avg": 174.0,
+      "qty": 257.0,
+      "amount": 44718.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "3037",
+      "stk_na": "欣興",
+      "side": "B",
+      "price_avg": 932.0,
+      "qty": 48.0,
+      "amount": 44736.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2316",
+      "stk_na": "楠梓電",
+      "side": "B",
+      "price_avg": 160.0,
+      "qty": 280.0,
+      "amount": 44800.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2492",
+      "stk_na": "華新科",
+      "side": "B",
+      "price_avg": 280.5,
+      "qty": 159.0,
+      "amount": 44599.5,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 665395.7994000001
+    }
+  ],
+  "20260525": [
+    {
+      "stk_no": "3090",
+      "stk_na": "日電貿",
+      "side": "S",
+      "price_avg": 236.5,
+      "qty": 114.0,
+      "amount": 26961.0,
+      "fee": 121.0,
+      "profit": 4617.0
+    },
+    {
+      "stk_no": "2472",
+      "stk_na": "立隆電",
+      "side": "S",
+      "price_avg": 279.5,
+      "qty": 170.0,
+      "amount": 47515.0,
+      "fee": 214.0,
+      "profit": 7565.0
+    },
+    {
+      "stk_no": "4958",
+      "stk_na": "臻鼎-KY",
+      "side": "S",
+      "price_avg": 529.0,
+      "qty": 174.0,
+      "amount": 92046.0,
+      "fee": 414.0,
+      "profit": 11397.0
+    },
+    {
+      "stk_no": "2363",
+      "stk_na": "矽統",
+      "side": "B",
+      "price_avg": 68.9,
+      "qty": 483.0,
+      "amount": 33278.700000000004,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "4919",
+      "stk_na": "新唐",
+      "side": "B",
+      "price_avg": 210.5,
+      "qty": 158.0,
+      "amount": 33259.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6271",
+      "stk_na": "同欣電",
+      "side": "B",
+      "price_avg": 234.0,
+      "qty": 142.0,
+      "amount": 33228.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6415",
+      "stk_na": "矽力*-KY",
+      "side": "B",
+      "price_avg": 609.0,
+      "qty": 54.0,
+      "amount": 32886.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6138",
+      "stk_na": "茂達",
+      "side": "B",
+      "price_avg": 332.0,
+      "qty": 100.0,
+      "amount": 33200.0,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 707220.6994000002
+    }
+  ],
+  "20260526": [
+    {
+      "stk_no": "2492",
+      "stk_na": "華新科",
+      "side": "S",
+      "price_avg": 328.5,
+      "qty": 79.0,
+      "amount": 25951.5,
+      "fee": 117.0,
+      "profit": 3792.0
+    },
+    {
+      "stk_no": "3037",
+      "stk_na": "欣興",
+      "side": "S",
+      "price_avg": 1085.0,
+      "qty": 24.0,
+      "amount": 26040.0,
+      "fee": 117.0,
+      "profit": 3672.0
+    },
+    {
+      "stk_no": "2328",
+      "stk_na": "廣宇",
+      "side": "B",
+      "price_avg": 57.3,
+      "qty": 183.0,
+      "amount": 10485.9,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "4991",
+      "stk_na": "環宇-KY",
+      "side": "B",
+      "price_avg": 850.0,
+      "qty": 12.0,
+      "amount": 10200.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6770",
+      "stk_na": "力積電",
+      "side": "B",
+      "price_avg": 69.9,
+      "qty": 150.0,
+      "amount": 10485.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2486",
+      "stk_na": "一詮",
+      "side": "B",
+      "price_avg": 305.5,
+      "qty": 34.0,
+      "amount": 10387.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6679",
+      "stk_na": "鈺太",
+      "side": "B",
+      "price_avg": 348.0,
+      "qty": 30.0,
+      "amount": 10440.0,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 731437.9994000002
+    }
+  ],
+  "20260527": [
+    {
+      "stk_no": "6706",
+      "stk_na": "惠特",
+      "side": "S",
+      "price_avg": 216.5,
+      "qty": 128.0,
+      "amount": 27712.0,
+      "fee": 125.0,
+      "profit": 5440.0
+    },
+    {
+      "stk_no": "2363",
+      "stk_na": "矽統",
+      "side": "S",
+      "price_avg": 66.833,
+      "qty": 483.0,
+      "amount": 32280.339,
+      "fee": 145.0,
+      "profit": -998.3610000000035
+    },
+    {
+      "stk_no": "2328",
+      "stk_na": "廣宇",
+      "side": "S",
+      "price_avg": 55.580999999999996,
+      "qty": 183.0,
+      "amount": 10171.322999999999,
+      "fee": 46.0,
+      "profit": -314.5770000000002
+    },
+    {
+      "stk_no": "4991",
+      "stk_na": "環宇-KY",
+      "side": "S",
+      "price_avg": 824.5,
+      "qty": 12.0,
+      "amount": 9894.0,
+      "fee": 45.0,
+      "profit": -306.0
+    },
+    {
+      "stk_no": "2486",
+      "stk_na": "一詮",
+      "side": "S",
+      "price_avg": 296.335,
+      "qty": 34.0,
+      "amount": 10075.39,
+      "fee": 45.0,
+      "profit": -311.6100000000007
+    },
+    {
+      "stk_no": "6679",
+      "stk_na": "鈺太",
+      "side": "S",
+      "price_avg": 337.56,
+      "qty": 30.0,
+      "amount": 10126.8,
+      "fee": 45.0,
+      "profit": -313.19999999999993
+    },
+    {
+      "stk_no": "3189",
+      "stk_na": "景碩",
+      "side": "B",
+      "price_avg": 726.0,
+      "qty": 27.0,
+      "amount": 19602.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2344",
+      "stk_na": "華邦電",
+      "side": "B",
+      "price_avg": 155.0,
+      "qty": 129.0,
+      "amount": 19995.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2489",
+      "stk_na": "瑞軒",
+      "side": "B",
+      "price_avg": 53.1,
+      "qty": 377.0,
+      "amount": 20018.7,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6679",
+      "stk_na": "鈺太",
+      "side": "B",
+      "price_avg": 342.0,
+      "qty": 58.0,
+      "amount": 19836.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6147",
+      "stk_na": "頎邦",
+      "side": "B",
+      "price_avg": 272.0,
+      "qty": 73.0,
+      "amount": 19856.0,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 751883.2514000002
+    }
+  ],
+  "20260528": [
+    {
+      "stk_no": "4919",
+      "stk_na": "新唐",
+      "side": "S",
+      "price_avg": 204.185,
+      "qty": 158.0,
+      "amount": 32261.23,
+      "fee": 145.0,
+      "profit": -997.7699999999996
+    },
+    {
+      "stk_no": "2344",
+      "stk_na": "華邦電",
+      "side": "S",
+      "price_avg": 150.35,
+      "qty": 129.0,
+      "amount": 19395.149999999998,
+      "fee": 87.0,
+      "profit": -599.8500000000007
+    },
+    {
+      "stk_no": "3090",
+      "stk_na": "日電貿",
+      "side": "S",
+      "price_avg": 217.58,
+      "qty": 114.0,
+      "amount": 24804.120000000003,
+      "fee": 111.0,
+      "profit": 2460.1200000000013
+    },
+    {
+      "stk_no": "3189",
+      "stk_na": "景碩",
+      "side": "S",
+      "price_avg": 704.22,
+      "qty": 27.0,
+      "amount": 19013.940000000002,
+      "fee": 86.0,
+      "profit": -588.0599999999993
+    },
+    {
+      "stk_no": "3675",
+      "stk_na": "德微",
+      "side": "S",
+      "price_avg": 384.0,
+      "qty": 124.0,
+      "amount": 47616.0,
+      "fee": 214.0,
+      "profit": 7440.0
+    },
+    {
+      "stk_no": "6706",
+      "stk_na": "惠特",
+      "side": "S",
+      "price_avg": 202.5,
+      "qty": 129.0,
+      "amount": 26122.5,
+      "fee": 117.0,
+      "profit": 3676.5
+    },
+    {
+      "stk_no": "6679",
+      "stk_na": "鈺太",
+      "side": "S",
+      "price_avg": 331.74,
+      "qty": 58.0,
+      "amount": 19240.920000000002,
+      "fee": 87.0,
+      "profit": -595.0799999999995
+    },
+    {
+      "stk_no": "2489",
+      "stk_na": "瑞軒",
+      "side": "S",
+      "price_avg": 51.507,
+      "qty": 377.0,
+      "amount": 19418.139,
+      "fee": 87.0,
+      "profit": -600.5610000000013
+    },
+    {
+      "stk_no": "2344",
+      "stk_na": "華邦電",
+      "side": "B",
+      "price_avg": 151.0,
+      "qty": 275.0,
+      "amount": 41525.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6182",
+      "stk_na": "合晶",
+      "side": "B",
+      "price_avg": 90.2,
+      "qty": 461.0,
+      "amount": 41582.200000000004,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6488",
+      "stk_na": "環球晶",
+      "side": "B",
+      "price_avg": 935.0,
+      "qty": 44.0,
+      "amount": 41140.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2301",
+      "stk_na": "光寶科",
+      "side": "B",
+      "price_avg": 242.0,
+      "qty": 171.0,
+      "amount": 41382.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "8016",
+      "stk_na": "矽創",
+      "side": "B",
+      "price_avg": 303.5,
+      "qty": 137.0,
+      "amount": 41579.5,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 749345.9504000001
+    }
+  ],
+  "20260529": [
+    {
+      "stk_no": "6488",
+      "stk_na": "環球晶",
+      "side": "S",
+      "price_avg": 1015.0,
+      "qty": 44.0,
+      "amount": 44660.0,
+      "fee": 201.0,
+      "profit": 3520.0
+    },
+    {
+      "stk_no": "2344",
+      "stk_na": "華邦電",
+      "side": "S",
+      "price_avg": 158.0,
+      "qty": 275.0,
+      "amount": 43450.0,
+      "fee": 195.0,
+      "profit": 1925.0
+    },
+    {
+      "stk_no": "6415",
+      "stk_na": "矽力*-KY",
+      "side": "S",
+      "price_avg": 611.8000000000001,
+      "qty": 54.0,
+      "amount": 33037.200000000004,
+      "fee": 149.0,
+      "profit": 151.20000000000368
+    },
+    {
+      "stk_no": "6147",
+      "stk_na": "頎邦",
+      "side": "S",
+      "price_avg": 305.5,
+      "qty": 73.0,
+      "amount": 22301.5,
+      "fee": 100.0,
+      "profit": 2445.5
+    },
+    {
+      "stk_no": "6770",
+      "stk_na": "力積電",
+      "side": "S",
+      "price_avg": 88.7,
+      "qty": 75.0,
+      "amount": 6652.5,
+      "fee": 30.0,
+      "profit": 1409.9999999999998
+    },
+    {
+      "stk_no": "2301",
+      "stk_na": "光寶科",
+      "side": "S",
+      "price_avg": 234.73999999999998,
+      "qty": 171.0,
+      "amount": 40140.53999999999,
+      "fee": 180.0,
+      "profit": -1241.4600000000032
+    },
+    {
+      "stk_no": "8150",
+      "stk_na": "南茂",
+      "side": "B",
+      "price_avg": 113.0,
+      "qty": 336.0,
+      "amount": 37968.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6291",
+      "stk_na": "沛亨",
+      "side": "B",
+      "price_avg": 695.0,
+      "qty": 54.0,
+      "amount": 37530.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2376",
+      "stk_na": "技嘉",
+      "side": "B",
+      "price_avg": 350.5,
+      "qty": 108.0,
+      "amount": 37854.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "5289",
+      "stk_na": "宜鼎",
+      "side": "B",
+      "price_avg": 1760.0,
+      "qty": 21.0,
+      "amount": 36960.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6531",
+      "stk_na": "愛普*",
+      "side": "B",
+      "price_avg": 1160.0,
+      "qty": 32.0,
+      "amount": 37120.0,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 782565.8904000001
+    }
+  ],
+  "20260601": [
+    {
+      "stk_no": "8150",
+      "stk_na": "南茂",
+      "side": "S",
+      "price_avg": 109.61,
+      "qty": 336.0,
+      "amount": 36828.96,
+      "fee": 165.0,
+      "profit": -1139.0400000000002
+    },
+    {
+      "stk_no": "6531",
+      "stk_na": "愛普*",
+      "side": "S",
+      "price_avg": 1125.2,
+      "qty": 32.0,
+      "amount": 36006.4,
+      "fee": 162.0,
+      "profit": -1113.5999999999985
+    },
+    {
+      "stk_no": "3675",
+      "stk_na": "德微",
+      "side": "S",
+      "price_avg": 379.96000000000004,
+      "qty": 125.0,
+      "amount": 47495.00000000001,
+      "fee": 213.0,
+      "profit": 6995.000000000005
+    },
+    {
+      "stk_no": "3037",
+      "stk_na": "欣興",
+      "side": "S",
+      "price_avg": 1050.0,
+      "qty": 24.0,
+      "amount": 25200.0,
+      "fee": 114.0,
+      "profit": 2832.0
+    },
+    {
+      "stk_no": "6291",
+      "stk_na": "沛亨",
+      "side": "S",
+      "price_avg": 674.15,
+      "qty": 54.0,
+      "amount": 36404.1,
+      "fee": 164.0,
+      "profit": -1125.9000000000012
+    },
+    {
+      "stk_no": "8358",
+      "stk_na": "金居",
+      "side": "B",
+      "price_avg": 637.0,
+      "qty": 71.0,
+      "amount": 45227.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2357",
+      "stk_na": "華碩",
+      "side": "B",
+      "price_avg": 837.0,
+      "qty": 54.0,
+      "amount": 45198.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6274",
+      "stk_na": "台燿",
+      "side": "B",
+      "price_avg": 1690.0,
+      "qty": 27.0,
+      "amount": 45630.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2344",
+      "stk_na": "華邦電",
+      "side": "B",
+      "price_avg": 168.0,
+      "qty": 272.0,
+      "amount": 45696.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2408",
+      "stk_na": "南亞科",
+      "side": "B",
+      "price_avg": 362.0,
+      "qty": 126.0,
+      "amount": 45612.0,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 841695.3504000002
+    }
+  ],
+  "20260602": [
+    {
+      "stk_no": "2344",
+      "stk_na": "華邦電",
+      "side": "S",
+      "price_avg": 184.5,
+      "qty": 272.0,
+      "amount": 50184.0,
+      "fee": 226.0,
+      "profit": 4488.0
+    },
+    {
+      "stk_no": "6412",
+      "stk_na": "群電",
+      "side": "S",
+      "price_avg": 104.0,
+      "qty": 842.0,
+      "amount": 87568.0,
+      "fee": 394.0,
+      "profit": 6736.0
+    },
+    {
+      "stk_no": "6138",
+      "stk_na": "茂達",
+      "side": "S",
+      "price_avg": 339.94,
+      "qty": 100.0,
+      "amount": 33994.0,
+      "fee": 153.0,
+      "profit": 793.9999999999998
+    },
+    {
+      "stk_no": "6182",
+      "stk_na": "合晶",
+      "side": "S",
+      "price_avg": 91.54,
+      "qty": 461.0,
+      "amount": 42199.94,
+      "fee": 190.0,
+      "profit": 617.7400000000016
+    },
+    {
+      "stk_no": "2376",
+      "stk_na": "技嘉",
+      "side": "S",
+      "price_avg": 390.5,
+      "qty": 108.0,
+      "amount": 42174.0,
+      "fee": 190.0,
+      "profit": 4320.0
+    },
+    {
+      "stk_no": "6274",
+      "stk_na": "台燿",
+      "side": "S",
+      "price_avg": 1639.3,
+      "qty": 27.0,
+      "amount": 44261.1,
+      "fee": 199.0,
+      "profit": -1368.9000000000012
+    },
+    {
+      "stk_no": "4938",
+      "stk_na": "和碩",
+      "side": "B",
+      "price_avg": 92.0,
+      "qty": 653.0,
+      "amount": 60076.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "3231",
+      "stk_na": "緯創",
+      "side": "B",
+      "price_avg": 179.0,
+      "qty": 335.0,
+      "amount": 59965.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2385",
+      "stk_na": "群光",
+      "side": "B",
+      "price_avg": 141.5,
+      "qty": 424.0,
+      "amount": 59996.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6414",
+      "stk_na": "樺漢",
+      "side": "B",
+      "price_avg": 382.5,
+      "qty": 157.0,
+      "amount": 60052.5,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "3706",
+      "stk_na": "神達",
+      "side": "B",
+      "price_avg": 94.5,
+      "qty": 635.0,
+      "amount": 60007.5,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 847702.2904000003
+    }
+  ],
+  "20260603": [
+    {
+      "stk_no": "2472",
+      "stk_na": "立隆電",
+      "side": "S",
+      "price_avg": 360.64000000000004,
+      "qty": 170.0,
+      "amount": 61308.80000000001,
+      "fee": 276.0,
+      "profit": 21358.800000000007
+    },
+    {
+      "stk_no": "8358",
+      "stk_na": "金居",
+      "side": "S",
+      "price_avg": 617.89,
+      "qty": 71.0,
+      "amount": 43870.19,
+      "fee": 198.0,
+      "profit": -1356.8100000000009
+    },
+    {
+      "stk_no": "4938",
+      "stk_na": "和碩",
+      "side": "S",
+      "price_avg": 98.5,
+      "qty": 653.0,
+      "amount": 64320.5,
+      "fee": 289.0,
+      "profit": 4244.5
+    },
+    {
+      "stk_no": "2385",
+      "stk_na": "群光",
+      "side": "S",
+      "price_avg": 145.5,
+      "qty": 424.0,
+      "amount": 61692.0,
+      "fee": 278.0,
+      "profit": 1696.0
+    },
+    {
+      "stk_no": "6548",
+      "stk_na": "長科*",
+      "side": "B",
+      "price_avg": 81.5,
+      "qty": 565.0,
+      "amount": 46047.5,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2352",
+      "stk_na": "佳世達",
+      "side": "B",
+      "price_avg": 33.75,
+      "qty": 1366.0,
+      "amount": 46102.5,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "5269",
+      "stk_na": "祥碩",
+      "side": "B",
+      "price_avg": 1635.0,
+      "qty": 28.0,
+      "amount": 45780.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6451",
+      "stk_na": "訊芯-KY",
+      "side": "B",
+      "price_avg": 702.0,
+      "qty": 65.0,
+      "amount": 45630.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "3006",
+      "stk_na": "晶豪科",
+      "side": "B",
+      "price_avg": 273.0,
+      "qty": 168.0,
+      "amount": 45864.0,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 847365.7804000003
+    }
+  ],
+  "20260604": [
+    {
+      "stk_no": "5269",
+      "stk_na": "祥碩",
+      "side": "S",
+      "price_avg": 1585.95,
+      "qty": 28.0,
+      "amount": 44406.6,
+      "fee": 200.0,
+      "profit": -1373.3999999999987
+    },
+    {
+      "stk_no": "2408",
+      "stk_na": "南亞科",
+      "side": "S",
+      "price_avg": 395.0,
+      "qty": 126.0,
+      "amount": 49770.0,
+      "fee": 224.0,
+      "profit": 4158.0
+    },
+    {
+      "stk_no": "2492",
+      "stk_na": "華新科",
+      "side": "S",
+      "price_avg": 419.52000000000004,
+      "qty": 80.0,
+      "amount": 33561.600000000006,
+      "fee": 151.0,
+      "profit": 11121.600000000002
+    },
+    {
+      "stk_no": "6770",
+      "stk_na": "力積電",
+      "side": "S",
+      "price_avg": 81.604,
+      "qty": 75.0,
+      "amount": 6120.3,
+      "fee": 27.0,
+      "profit": 877.7999999999995
+    },
+    {
+      "stk_no": "3231",
+      "stk_na": "緯創",
+      "side": "S",
+      "price_avg": 178.48000000000002,
+      "qty": 335.0,
+      "amount": 59790.8,
+      "fee": 269.0,
+      "profit": -174.1999999999939
+    },
+    {
+      "stk_no": "6548",
+      "stk_na": "長科*",
+      "side": "S",
+      "price_avg": 98.1,
+      "qty": 565.0,
+      "amount": 55426.5,
+      "fee": 249.0,
+      "profit": 9378.999999999996
+    },
+    {
+      "stk_no": "6451",
+      "stk_na": "訊芯-KY",
+      "side": "S",
+      "price_avg": 680.9399999999999,
+      "qty": 65.0,
+      "amount": 44261.1,
+      "fee": 199.0,
+      "profit": -1368.9000000000037
+    },
+    {
+      "stk_no": "3006",
+      "stk_na": "晶豪科",
+      "side": "S",
+      "price_avg": 264.81,
+      "qty": 168.0,
+      "amount": 44488.08,
+      "fee": 200.0,
+      "profit": -1375.9199999999996
+    },
+    {
+      "stk_no": "3015",
+      "stk_na": "全漢",
+      "side": "B",
+      "price_avg": 57.1,
+      "qty": 1181.0,
+      "amount": 67435.1,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2385",
+      "stk_na": "群光",
+      "side": "B",
+      "price_avg": 145.5,
+      "qty": 463.0,
+      "amount": 67366.5,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2356",
+      "stk_na": "英業達",
+      "side": "B",
+      "price_avg": 84.6,
+      "qty": 797.0,
+      "amount": 67426.2,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "6715",
+      "stk_na": "嘉基",
+      "side": "B",
+      "price_avg": 476.0,
+      "qty": 141.0,
+      "amount": 67116.0,
+      "fee": 0.0,
+      "profit": 0.0
+    },
+    {
+      "stk_no": "2328",
+      "stk_na": "廣宇",
+      "side": "B",
+      "price_avg": 60.3,
+      "qty": 1119.0,
+      "amount": 67475.7,
+      "fee": 0.0,
+      "profit": 0.0,
+      "invested_capital_snapshot": 827064.2604000001
+    }
+  ]
+}
