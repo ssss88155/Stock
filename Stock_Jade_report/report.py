@@ -24,6 +24,7 @@ JSON_PATH = os.path.join(DOC_DIR, 'transactions.json')
 INV_CACHE = os.path.join(DOC_DIR, 'inv_cache.p')
 LOCAL_DATA_DIR = r'C:\jupyter_notebook\ai_twstock\data_independent'
 MICRO_JSON_PATH = r'C:\jupyter_notebook\ai_twstock\stock_data_micro.json'
+PRICE_JSON_PATH = r'C:\jupyter_notebook\ai_twstock\stock_data.json'
 
 def force_float(val):
     if val is None or val == "": return 0.0
@@ -149,7 +150,9 @@ def main():
         
         # 嚴格限制：只有 -1 才同步 SDK
         if args.mode == -1:
-            # 整合 data_independent_microstructure 微觀資料
+            # 整合資料
+            print(f"[INFO] 整合 price 價格資料...")
+            sync_independent_data(PRICE_JSON_PATH, 'data_independent_price')
             print(f"[INFO] 整合 micro 微觀資料...")
             sync_independent_data(MICRO_JSON_PATH, 'data_independent_microstructure')
             
