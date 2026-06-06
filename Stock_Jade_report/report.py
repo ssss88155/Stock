@@ -14,7 +14,7 @@ from esun_marketdata.util import TRADE_SDK_ACCOUNT_KEY, TRADE_SDK_CERT_KEY, setu
 
 # 將 lib 目錄加入 Python 路徑
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lib'))
-from common_lib import Color, pad_string, get_display_width
+from common_lib import Color, pad_string, get_display_width, sync_independent_data
 
 # --- 配置區 ---
 CONFIG_PATH = './config.ini'
@@ -23,6 +23,7 @@ DOC_DIR = 'doc'
 JSON_PATH = os.path.join(DOC_DIR, 'transactions.json')
 INV_CACHE = os.path.join(DOC_DIR, 'inv_cache.p')
 LOCAL_DATA_DIR = r'C:\jupyter_notebook\ai_twstock\data_independent'
+MICRO_JSON_PATH = r'C:\jupyter_notebook\ai_twstock\stock_data_micro.json'
 
 def force_float(val):
     if val is None or val == "": return 0.0
@@ -148,6 +149,10 @@ def main():
         
         # 嚴格限制：只有 -1 才同步 SDK
         if args.mode == -1:
+            # 整合 data_independent_microstructure 微觀資料
+            print(f"[INFO] 整合 micro 微觀資料...")
+            sync_independent_data(MICRO_JSON_PATH, 'data_independent_microstructure')
+            
             try:
                 print(f"[INFO] 正在連接玉山 SDK 同步即時資料...")
                 sdk = login_sdk()

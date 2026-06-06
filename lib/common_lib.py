@@ -64,6 +64,7 @@ def pad_string(s, width, align='left'):
 
 # --- 資料讀取與同步 ---
 _LOADED_DATA_CACHE = None
+_MICRO_LOADED_DATA_CACHE = None
 
 def get_script_dir(file_path):
     return os.path.dirname(os.path.abspath(file_path))
@@ -82,13 +83,39 @@ def load_stock_data(filename='stock_data.json', script_file=None):
     path = os.path.join(base_dir, filename)
     
     # 自動執行增量合併 (假設 data_independent 在同目錄)
-    sync_independent_data(path)
+    sync_independent_data(path, 'data_independent')
     
     if os.path.exists(path):
         with open(path, 'r', encoding='utf-8') as f:
             try:
                 data = json.load(f)
                 _LOADED_DATA_CACHE = data
+                return data
+            except json.JSONDecodeError:
+                return {}
+    return {}
+
+def load_stock_data_micro(filename='stock_data_micro.json', script_file=None):
+    """
+    載入大型股票微觀結構 JSON 資料
+    :param filename: 檔名
+    :param script_file: 呼叫者的 __file__，用來定位目錄
+    """
+    global _MICRO_LOADED_DATA_CACHE
+    if _MICRO_LOADED_DATA_CACHE is not None:
+        return _MICRO_LOADED_DATA_CACHE
+        
+    base_dir = get_script_dir(script_file) if script_file else os.getcwd()
+    path = os.path.join(base_dir, filename)
+    
+    # 自動執行增量合併 (data_independent_microstructure 目錄)
+    sync_independent_data(path, 'data_independent_microstructure')
+    
+    if os.path.exists(path):
+        with open(path, 'r', encoding='utf-8') as f:
+            try:
+                data = json.load(f)
+                _MICRO_LOADED_DATA_CACHE = data
                 return data
             except json.JSONDecodeError:
                 return {}
@@ -116,10 +143,23 @@ def load_independent_stock_data_custom(stock_id, base_dir, dir_name):
         except Exception: pass
     return {}
 
-def sync_independent_data(target_path):
-    """將 data_independent 中的更新同步到大 JSON 檔案"""
+def load_independent_stock_data_micro(stock_id, base_dir):
+    """載入獨立的個股微觀結構 JSON 資料"""
+    path = os.path.join(base_dir, 'data_independent_microstructure', f"{stock_id}.json")
+    if os.path.exists(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception: pass
+    return {}
+
+def sync_independent_data(target_path, source_dir_name='data_independent'):
+    """將 source_dir_name 中的更新同步到大 JSON 檔案
+    :param target_path: 目標大 JSON 檔案路徑
+    :param source_dir_name: 來源目錄名稱 (例如 'data_independent' 或 'data_independent_microstructure')
+    """
     base_dir = os.path.dirname(target_path)
-    source_dir = os.path.join(base_dir, 'data_independent')
+    source_dir = os.path.join(base_dir, source_dir_name)
     
     if not os.path.exists(source_dir):
         return
@@ -152,7 +192,14 @@ def sync_independent_data(target_path):
         for _ in range(3):
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
-                    merged_data.update(json.load(f))
+                    data = json.load(f)
+                    # data_independent_microstructure 的檔案格式是 {trading_daily_report: {...}}
+                    # 需要用檔名當 key 包裝成 {sid: data}
+                    if source_dir_name == 'data_independent_microstructure':
+                        sid = os.path.splitext(os.path.basename(file_path))[0]
+                        merged_data[sid] = data
+                    else:
+                        merged_data.update(data)
                 break
             except (PermissionError, json.JSONDecodeError):
                 time.sleep(0.1)
