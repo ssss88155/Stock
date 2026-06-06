@@ -1,4 +1,4 @@
-奧動import os
+import os
 import json
 import pandas as pd
 import sys
@@ -7,34 +7,8 @@ from datetime import datetime
 from collections import OrderedDict
 
 # 將 lib 目錄加入 Python 路徑
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'lib'))
-try:
-    from common_lib import Color, pad_string, get_display_width
-except ImportError:
-    class Color:
-        RED = "\033[91m"; GREEN = "\033[92m"; YELLOW = "\033[93m"; ORANGE = "\033[38;5;208m"
-        BLUE = "\033[94m"; PURPLE = "\033[95m"; CYAN = "\033[96m"; DIM = "\033[2m"; RESET = "\033[0m"; WHITE = "\033[97m"
-        @staticmethod
-        def wrap(text, color): return f"{color}{text}{Color.RESET}"
-    
-    def get_display_width(s):
-        import unicodedata
-        width = 0
-        for char in str(s):
-            if unicodedata.east_asian_width(char) in ('W', 'F', 'A'): width += 2
-            else: width += 1
-        return width
-
-    def pad_string(s, width, align='left'):
-        s = str(s)
-        current_width = get_display_width(s)
-        pad_size = max(0, width - current_width)
-        if align == 'left': return s + ' ' * pad_size
-        elif align == 'right': return ' ' * pad_size + s
-        else:
-            left_pad = pad_size // 2
-            right_pad = pad_size - left_pad
-            return ' ' * left_pad + s + ' ' * right_pad
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lib'))
+from common_lib import Color, pad_string, get_display_width
 
 import backtest_momentum
 
@@ -145,7 +119,10 @@ def generate_report():
     log_print("".join(pad_string(h, h_wids[i], 'center') for i, h in enumerate(h_cols)))
     log_print("-" * 110)
     
+    # 統計時區分「活躍持股」與「全體(包含已清倉)」
     active_buy, active_sell, active_cash_pl, active_total_pl = 0, 0, 0, 0
+    total_buy, total_sell, total_cash_pl, total_overall_pl = 0, 0, 0, 0
+    
     rows = []
     for r in report_rows:
         sid = r['編號']
@@ -156,11 +133,19 @@ def generate_report():
         total_pl_val = r['總盈虧']
         unrealized = total_pl_val - cash_pl
         curr_p = avg_p + (unrealized / shares) if shares > 0 else 0
-        rows.append({
+        
+        row_data = {
             "編號": sid, "公司": r['公司'], "購買金額": r['購買金額'],
             "賣出金額": pos.get('total_sold_revenue', 0), "現金盈虧": cash_pl,
             "尚餘股數": shares, "均價": avg_p, "現價": curr_p, "總盈虧": total_pl_val
-        })
+        }
+        rows.append(row_data)
+        
+        # 累計全體數據
+        total_buy += row_data['購買金額']
+        total_sell += row_data['賣出金額']
+        total_cash_pl += row_data['現金盈虧']
+        total_overall_pl += row_data['總盈虧']
 
     rows.sort(key=lambda x: x["尚餘股數"] == 0)
     for r in rows:
@@ -188,7 +173,9 @@ def generate_report():
             log_print("".join(line))
 
     log_print("-" * 110)
-    sum_line = [
+    
+    # 活躍持股合計
+    sum_line_active = [
         pad_string("合計 (活躍持股)", h_wids[0] + h_wids[1], 'left'),
         pad_string(f"{active_buy:,.0f}", h_wids[2], 'right'),
         pad_string(f"{active_sell:,.0f}", h_wids[3], 'right'),
@@ -196,9 +183,22 @@ def generate_report():
         pad_string("", h_wids[5] + h_wids[6] + h_wids[7], 'right'),
         pad_string(f"{active_total_pl:,.0f}", h_wids[8], 'right')
     ]
-    if active_total_pl < 0: sum_line[5] = Color.wrap(sum_line[5], Color.GREEN)
-    elif active_total_pl > 0: sum_line[5] = Color.wrap(sum_line[5], Color.RED)
-    log_print("".join(sum_line))
+    if active_total_pl < 0: sum_line_active[5] = Color.wrap(sum_line_active[5], Color.GREEN)
+    elif active_total_pl > 0: sum_line_active[5] = Color.wrap(sum_line_active[5], Color.RED)
+    log_print("".join(sum_line_active))
+    
+    # 全體標的合計 (包含已清倉)
+    sum_line_total = [
+        pad_string("累計 (全體標的)", h_wids[0] + h_wids[1], 'left'),
+        pad_string(f"{total_buy:,.0f}", h_wids[2], 'right'),
+        pad_string(f"{total_sell:,.0f}", h_wids[3], 'right'),
+        pad_string(f"{total_cash_pl:,.0f}", h_wids[4], 'right'),
+        pad_string("", h_wids[5] + h_wids[6] + h_wids[7], 'right'),
+        pad_string(f"{total_overall_pl:,.0f}", h_wids[8], 'right')
+    ]
+    if total_overall_pl < 0: sum_line_total[5] = Color.wrap(sum_line_total[5], Color.GREEN)
+    elif total_overall_pl > 0: sum_line_total[5] = Color.wrap(sum_line_total[5], Color.RED)
+    log_print("".join(sum_line_total))
 
     # --- Section 3: 最終結果與月份摘要 ---
     log_print("\n" + "="*55 + "\n  三、 最終投資結果與月份摘要\n" + "="*55)
@@ -222,11 +222,19 @@ def generate_report():
         if equity > 0: month_data[m_key] = equity
     
     prev_equity = best_cfg['STARTING_CASH']
+    contribution = best_cfg.get('MONTHLY_CONTRIBUTION', 0)
+    is_first_month = True
+    
     for m, eq in month_data.items():
-        diff = eq - prev_equity
-        pct = (diff / prev_equity * 100) if prev_equity > 0 else 0
+        # 如果不是第一個月份，差值需扣除當月投入本金才是實際損益
+        current_contribution = 0 if is_first_month else contribution
+        diff = eq - prev_equity - current_contribution
+        
+        pct = (diff / (prev_equity + current_contribution) * 100) if (prev_equity + current_contribution) > 0 else 0
         line = pad_string(m, m_w[0], 'left') + pad_string(f"{eq:,.0f}", m_w[1], 'right') + \
                pad_string(f"{diff:,.0f}", m_w[2], 'right') + pad_string(f"{pct:.2f}%", m_w[3], 'right')
+               
+        is_first_month = False
         if diff > 0: log_print(Color.wrap(line, Color.RED))
         elif diff < 0: log_print(Color.wrap(line, Color.GREEN))
         else: log_print(line)

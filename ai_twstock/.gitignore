@@ -3,3 +3,13 @@ monthly_report.txt
 temp_data/monthly_report.txt
 temp_data/output.txt
 output.txt
+# 排除所有 JSON 檔案，除了 temp_data 裡面的
+*.json
+**/*.json
+!temp_data/*.json
+!config/*.json
+!taiwan_stocks.csv
+# 排除大型資料目錄
+data_independent_price/
+data_independent_microstructure/
+stock_data.json
