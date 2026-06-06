@@ -37,7 +37,11 @@ def run_realtime_forecast():
         print(f"  [INFO] SDK 未連線 (或是連線失敗)，使用預設資金: {available_cash:,.0f}")
 
     # 2. 執行分析 (T-1 資料預測今日 T 開盤)
-    buy_candidates, best_cfg, last_data_date = forecast_lib.find_buy_candidates_realtime()
+    data = analyze_momentum.load_stock_data_wrapper()
+    buy_candidates, best_cfg, last_data_date = forecast_lib.find_buy_candidates_realtime(
+        data,
+        analyze_momentum.analyze_momentum
+    )
     
     if not buy_candidates:
         print(f"\n  [SKIPPED] {last_data_date} No strong candidates found.")

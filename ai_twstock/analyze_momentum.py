@@ -179,93 +179,13 @@ def check_institutional_consensus(inst_data, date):
 def load_stock_data_wrapper(filename='stock_data.json'):
     return load_stock_data(filename, __file__)
 
-# --- 技術指標計算 ---
-
-def calculate_ema(prices, periods):
-    """計算指數移動平均線 (EMA)"""
-    if len(prices) < periods:
-        return prices[-1] if prices else 0
-    
-    alpha = 2 / (periods + 1)
-    ema = prices[0]
-    for price in prices[1:]:
-        ema = price * alpha + ema * (1 - alpha)
-    return ema
-
-def calculate_macd(price_data, sorted_dates, idx):
-    """
-    計算 MACD 指標 (12, 26, 9)
-    回傳: DIF, MACD_Signal, Histogram (OSC)
-    """
-    # 至少需要 26+9 = 35 天的數據來計算相對穩定的 MACD
-    LOOKBACK = 60
-    if idx < LOOKBACK:
-        return 0, 0, 0, 0, 0, 0
-    
-    lookback_dates = sorted_dates[idx - LOOKBACK : idx + 1]
-    prices = [price_data[d]['close'] for d in lookback_dates]
-    
-    # 1. 計算 DIF (EMA12 - EMA26)
-    # 為了計算 Signal Line (EMA9 of DIF)，我們需要一段時間的 DIF
-    dif_history = []
-    for i in range(26, len(prices) + 1):
-        window = prices[:i]
-        ema12 = calculate_ema(window, 12)
-        ema26 = calculate_ema(window, 26)
-        dif_history.append(ema12 - ema26)
-    
-    if len(dif_history) < 9:
-        return dif_history[-1], 0, dif_history[-1], 0, 0, 0
-    
-    # 2. 計算 MACD Signal (EMA9 of DIF)
-    macd_signal = calculate_ema(dif_history, 9)
-    
-    # 3. 計算 Histogram (OSC)
-    dif = dif_history[-1]
-    osc = dif - macd_signal
-    
-    # 為了判斷趨勢，我們也需要「昨日」的資料
-    prev_dif = dif_history[-2]
-    # 計算昨日的 Signal Line
-    prev_macd_signal = calculate_ema(dif_history[:-1], 9)
-    prev_osc = prev_dif - prev_macd_signal
-    
-    return dif, macd_signal, osc, prev_dif, prev_macd_signal, prev_osc
+# 註：技術指標計算 (EMA, MACD, MA) 已遷移至 lib/forecast_lib.py
 
 # --- 核心機制函數 ---
 
 # [Upgrade] 連續帶量機制：過濾單日誘多雜訊，要求今日量比>2.0且昨日量比>1.2
-def check_volume_breakthrough(price_data, sorted_dates, idx):
-    if idx < 2: return False, 0
-    actual_lookback = min(idx, VOL_AVG_DAYS)
-    
-    current_vol = price_data[sorted_dates[idx]].get('Trading_Volume', 0)
-    prev_vol = price_data[sorted_dates[idx-1]].get('Trading_Volume', 0)
-    
-    lookback_vols = [price_data[sorted_dates[i]].get('Trading_Volume', 0) for i in range(idx - actual_lookback - 1, idx - 1)]
-    avg_vol = sum(lookback_vols) / len(lookback_vols) if lookback_vols else 0
-    if avg_vol == 0: return False, 0
-    
-    ratio = current_vol / avg_vol
-    prev_ratio = prev_vol / avg_vol
-    
-    # 修改：要求連續兩天帶量，確保動能具備連續性
-    is_breakthrough = (ratio >= VOL_BREAKTHROUGH_RATIO) and (prev_ratio >= 1.2)
-    return is_breakthrough, ratio
-
-def check_sitc_momentum(inst_data, sorted_dates, idx):
-    if idx < 1: return False, 0
-    actual_lookback = min(idx, SITC_AVG_DAYS)
-    def get_net(i):
-        d = inst_data.get(sorted_dates[i], {}).get('Investment_Trust', {})
-        return d.get('buy', 0) - d.get('sell', 0)
-    current_net = get_net(idx)
-    if current_net < SITC_MIN_BUY_SHARES: return False, 0
-    prev_nets = [abs(get_net(i)) for i in range(idx - actual_lookback, idx)]
-    avg_net = sum(prev_nets) / len(prev_nets) if prev_nets else 0
-    effective_avg = max(avg_net, SITC_MIN_BUY_SHARES / 2)
-    ratio = current_net / effective_avg
-    return ratio >= SITC_MULTI_RATIO, ratio
+# 註：底層基礎分析函數 (check_volume_breakthrough, check_sitc_momentum, check_foreign_streak, check_dealer_inflow)
+# 已遷移至 lib/forecast_lib.py，此處改為在 analyze_momentum 內部動態呼叫。
 
 def check_price_streak(price_data, sorted_dates, idx):
     streak = 0
@@ -275,19 +195,6 @@ def check_price_streak(price_data, sorted_dates, idx):
         if cur > prev: streak += 1
         else: break
     return streak
-
-def check_foreign_streak(inst_data, sorted_dates, idx):
-    streak = 0
-    for i in range(idx, -1, -1):
-        d = inst_data.get(sorted_dates[i], {}).get('Foreign_Investor', {})
-        if (d.get('buy', 0) - d.get('sell', 0)) > 0: streak += 1
-        else: break
-    return streak >= FOREIGN_STREAK_DAYS, streak
-
-def check_dealer_inflow(inst_data, sorted_dates, idx):
-    d = inst_data.get(sorted_dates[idx], {}).get('Dealer_self', {})
-    net = d.get('buy', 0) - d.get('sell', 0)
-    return net >= DEALER_INFLOW_THRESHOLD, net
 
 def check_resistance_breakout(price_data, sorted_dates, idx):
     if idx < 1: return False, 0
@@ -380,16 +287,38 @@ def analyze_momentum(data, start_date, end_date, weights=None):
             sorted_dates = sorted(price_data.keys())
             _SORTED_DATES_CACHE[stock_id] = sorted_dates
         idx = sorted_dates.index(end_date)
-        vol_ok, vol_ratio = check_volume_breakthrough(price_data, sorted_dates, idx)
-        sitc_ok, sitc_ratio = check_sitc_momentum(inst_data, sorted_dates, idx)
-        foreign_ok, foreign_days = check_foreign_streak(inst_data, sorted_dates, idx)
+        
+        # 呼叫底層 lib/forecast_lib 的基礎分析函數
+        from forecast_lib import (
+            check_volume_breakthrough as lib_vol,
+            check_sitc_momentum as lib_sitc,
+            check_foreign_streak as lib_foreign,
+            check_dealer_inflow as lib_dealer
+        )
+        
+        # 封裝 CONFIG 供底層使用
+        LIB_CONFIG = {
+            "VOL_AVG_DAYS": VOL_AVG_DAYS,
+            "VOL_BREAKTHROUGH_RATIO": VOL_BREAKTHROUGH_RATIO,
+            "SITC_AVG_DAYS": SITC_AVG_DAYS,
+            "SITC_MULTI_RATIO": SITC_MULTI_RATIO,
+            "SITC_MIN_BUY_SHARES": SITC_MIN_BUY_SHARES,
+            "FOREIGN_STREAK_DAYS": FOREIGN_STREAK_DAYS,
+            "DEALER_MIN_BUY_SHARES": DEALER_INFLOW_THRESHOLD
+        }
+        
+        vol_ok, vol_ratio = lib_vol(price_data, sorted_dates, idx, LIB_CONFIG)
+        sitc_ok, sitc_ratio = lib_sitc(inst_data, sorted_dates, idx, LIB_CONFIG)
+        foreign_ok, foreign_days = lib_foreign(inst_data, sorted_dates, idx, LIB_CONFIG)
+        
         vcp_ok, vcp_score = check_vcp_pattern(price_data, sorted_dates, idx)
         handover_ok, handover_score = check_handover_consolidation(price_data, sorted_dates, idx)
         breakout_ok, res_level = check_resistance_breakout(price_data, sorted_dates, idx)
         inst_status, inst_multiplier = check_institutional_consensus(inst_data, end_date)
         
         # [Upgrade] 593%演算法升級 (第二門檻)並減少亂買：MACD 與量能持有的依據
-        dif, macd_sig, osc, prev_dif, prev_macd_sig, prev_osc = calculate_macd(price_data, sorted_dates, idx)
+        from forecast_lib import calculate_macd as lib_macd
+        dif, macd_sig, osc, prev_dif, prev_macd_sig, prev_osc = lib_macd(price_data, sorted_dates, idx)
         
         # 條件 1: 綠柱(負值)準備要回到0、看起來要到正的時候 (柱狀體大於昨日)
         osc_improving = (osc > prev_osc)
