@@ -375,9 +375,15 @@ def run_momentum_day_trading_backtest(override_config=None, silent=False):
         print(f"交易次數: {len(transactions)}")
 
         print(f"\n策略分析 (買入/賣出):")
-        print(f"  MOMENTUM: 買 {len(mom_buys)} / 賣 {len(mom_sells)} | 賣出勝率 {len([g for g in mom_gains if g>0])/len(mom_gains):.1% if mom_gains else 0} 平均 {sum(mom_gains)/len(mom_gains):.2% if mom_gains else 0}")
-        print(f"  REVERSAL: 買 {len(reversal_buys)} / 賣 {len(reversal_sells)} | 賣出勝率 {len([g for g in rev_gains if g>0])/len(rev_gains):.1% if rev_gains else 0} 平均 {sum(rev_gains)/len(rev_gains):.2% if rev_gains else 0}")
-        print(f"  FOLLOW:   買 {len(follow_buys)} / 賣 {len(follow_sells)} | 賣出勝率 {len([g for g in fol_gains if g>0])/len(fol_gains):.1% if fol_gains else 0} 平均 {sum(fol_gains)/len(fol_gains):.2% if fol_gains else 0}")
+        mom_wr = (len([g for g in mom_gains if g>0])/len(mom_gains) if mom_gains else 0)
+        mom_avg = (sum(mom_gains)/len(mom_gains) if mom_gains else 0)
+        rev_wr = (len([g for g in rev_gains if g>0])/len(rev_gains) if rev_gains else 0)
+        rev_avg = (sum(rev_gains)/len(rev_gains) if rev_gains else 0)
+        fol_wr = (len([g for g in fol_gains if g>0])/len(fol_gains) if fol_gains else 0)
+        fol_avg = (sum(fol_gains)/len(fol_gains) if fol_gains else 0)
+        print(f"  MOMENTUM: 買 {len(mom_buys)} / 賣 {len(mom_sells)} | 賣出勝率 {mom_wr:.1%} 平均 {mom_avg:.2%}")
+        print(f"  REVERSAL: 買 {len(reversal_buys)} / 賣 {len(reversal_sells)} | 賣出勝率 {rev_wr:.1%} 平均 {rev_avg:.2%}")
+        print(f"  FOLLOW:   買 {len(follow_buys)} / 賣 {len(follow_sells)} | 賣出勝率 {fol_wr:.1%} 平均 {fol_avg:.2%}")
 
         print(f"\n總體: 買 {len([t for t in transactions if t['action']=='BUY'])} / 賣 {len(all_sells)} | 整體勝率 {overall_win:.1%} 賣出平均 {sum(all_gains)/len(all_gains):.2% if all_gains else 0}")
         print(f"反彈後持續跟進次數: {continued}")
