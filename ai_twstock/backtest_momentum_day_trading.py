@@ -385,7 +385,8 @@ def run_momentum_day_trading_backtest(override_config=None, silent=False):
         print(f"  REVERSAL: 買 {len(reversal_buys)} / 賣 {len(reversal_sells)} | 賣出勝率 {rev_wr:.1%} 平均 {rev_avg:.2%}")
         print(f"  FOLLOW:   買 {len(follow_buys)} / 賣 {len(follow_sells)} | 賣出勝率 {fol_wr:.1%} 平均 {fol_avg:.2%}")
 
-        print(f"\n總體: 買 {len([t for t in transactions if t['action']=='BUY'])} / 賣 {len(all_sells)} | 整體勝率 {overall_win:.1%} 賣出平均 {sum(all_gains)/len(all_gains):.2% if all_gains else 0}")
+        overall_avg = (sum(all_gains)/len(all_gains) if all_gains else 0)
+        print(f"\n總體: 買 {len([t for t in transactions if t['action']=='BUY'])} / 賣 {len(all_sells)} | 整體勝率 {overall_win:.1%} 賣出平均 {overall_avg:.2%}")
         print(f"反彈後持續跟進次數: {continued}")
 
     result = {
