@@ -327,7 +327,12 @@ def main():
     config_path = os.path.join(get_script_dir(__file__), 'config', 'find_mind_config.json')
     if not os.path.exists(config_path):
         config_path = os.path.join(get_script_dir(__file__), 'config.json')
-    if not os.path.exists(config_path): return
+    if not os.path.exists(config_path):
+        print(f"[ERROR] 找不到配置檔案！")
+        print(f"  嘗試路徑 1: {os.path.join(get_script_dir(__file__), 'config', 'find_mind_config.json')}")
+        print(f"  嘗試路徑 2: {os.path.join(get_script_dir(__file__), 'config.json')}")
+        print(f"  請確認配置檔案存在並包含有效的 FinMind API token")
+        return
     with open(config_path, 'r') as f: config = json.load(f)
     
     apis = []
@@ -338,7 +343,11 @@ def main():
             level = 2 if api.api_usage_limit > 600 else 1
             apis.append({'api': api, 'level': level, 'name': k})
     
-    if not apis: return
+    if not apis:
+        print(f"[ERROR] 沒有找到有效的 FinMind API 配置！")
+        print(f"  配置檔案: {config_path}")
+        print(f"  請確認配置檔案中包含以 'find_mind' 開頭的有效 token")
+        return
     primary_api = apis[0] # 使用第一個 (也是唯一的) 高額度帳號
 
     # 讀取國定假日
@@ -373,7 +382,7 @@ def main():
     # 如果今天是假日，則 end_date 應該自動回溯到最後一個交易日
     # 這裡透過 pd.date_range 的 freq='B' 配合 holidays 過濾來達成
 
-    start_date_str = (now - timedelta(days=240)).strftime('%Y-%m-%d')
+    start_date_str = (now - timedelta(days=250)).strftime('%Y-%m-%d')
     
     # 修正：如果今天被誤植在假日檔中，先在記憶體中排除它，確保今天能被正確抓取
     if today_str in holidays:
