@@ -115,10 +115,10 @@ def calculate_day_trading_signal(sid, date, data, micro_features):
     inst = data.get(sid, {}).get('institutional', {}).get(date, {})
     brokers = inst.get('brokers', []) or []
 
-    day_trader_sell = 0.0
-    day_trader_buy = 0.0
-    stable_buy = 0.0
-    stable_sell = 0.0
+    # 隔日沖訊號演算法：使用 "股票數 × |穩重指數|" 加權評分
+    # 每家券商的貢獻 = 淨股數 × |穩重指數| / 100，然後依正負號累加到 reversal_score 或 follow_score
+    reversal_score = 0.0   # 隔日沖倒貨加權分 (負穩重指數 + 賣出)
+    follow_score = 0.0     # 隔日沖/穩健買超加權分
 
     for b in brokers:
         bid = str(b.get('id', ''))
@@ -126,42 +126,50 @@ def calculate_day_trading_signal(sid, date, data, micro_features):
         if bid not in micro_features:
             continue
         stability = micro_features[bid].get('穩重指數', 0)
+        abs_stab = abs(stability)
+
+        # 每家貢獻 = 淨股數 × |穩重指數| / 100 （把評分當權重）
+        contrib = net * abs_stab / 100.0
 
         if stability < 0:  # 隔日沖券商
             if net < 0:
-                day_trader_sell += abs(net)
+                reversal_score += abs(contrib)   # 倒貨貢獻反彈分
             else:
-                day_trader_buy += net
+                follow_score += contrib          # 拉抬也算跟進分
         else:  # 穩健券商
             if net > 0:
-                stable_buy += net
-            else:
-                stable_sell += abs(net)
+                follow_score += contrib
+            # 穩健賣超不特別加分
 
-    # 簡單規則 (第一版寬鬆)
-    if day_trader_sell > 500000 and day_trader_sell > day_trader_buy * 1.5:
-        strength = min(100, day_trader_sell / 1000000 * 30)
-        return {
+    # === TEMP DEBUG: 印出加權計算過程（只有當有券商明細資料時才印）===
+    if brokers:
+        print(f"[DT DEBUG] {date} {sid} | reversal_score={reversal_score:.1f} follow_score={follow_score:.1f} (股票數 × |穩重指數| 加權)")
+    # === END TEMP DEBUG ===
+
+    # 門檻（先用較低值讓過程可見，之後依實際 log 調整）
+    if reversal_score > 50 and reversal_score > follow_score * 1.2:
+        strength = min(100, reversal_score / 100.0)
+        result = {
             'type': 'REVERSAL',
             'strength': strength,
-            'reason': f'隔日沖倒貨 {day_trader_sell:,.0f}股，預期反彈'
+            'reason': f'隔日沖加權倒貨分 {reversal_score:.0f}，預期反彈'
         }
-    elif day_trader_buy > 500000 and day_trader_buy > day_trader_sell * 1.5:
-        strength = min(100, day_trader_buy / 1000000 * 25)
-        return {
+    elif follow_score > 30:
+        strength = min(100, follow_score / 80.0)
+        result = {
             'type': 'FOLLOW',
             'strength': strength,
-            'reason': f'隔日沖大量買進 {day_trader_buy:,.0f}股，跟進'
+            'reason': f'隔日沖/穩健加權買超分 {follow_score:.0f}，跟進'
         }
-    elif stable_buy > stable_sell * 1.2 and stable_buy > 300000:
-        strength = min(80, stable_buy / 1000000 * 20)
-        return {
-            'type': 'FOLLOW',
-            'strength': strength,
-            'reason': f'穩健券商買超 {stable_buy:,.0f}股'
-        }
+    else:
+        result = {'type': None, 'strength': 0.0, 'reason': '無明顯隔日沖加權訊號'}
 
-    return {'type': None, 'strength': 0.0, 'reason': '無明顯隔日沖訊號'}
+    # === TEMP DEBUG: 最終訊號 ===
+    if brokers:
+        print(f"[DT RESULT] {date} {sid} -> {result['type']} str={result['strength']:.1f} ({result['reason']})")
+    # === END TEMP DEBUG ===
+
+    return result
 
 def decide_buy(momentum_score, dt_signal, mom_threshold=LOOSE_BUY_SCORE_THRESHOLD):
     """

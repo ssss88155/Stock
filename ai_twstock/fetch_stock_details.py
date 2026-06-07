@@ -382,7 +382,7 @@ def main():
     # 如果今天是假日，則 end_date 應該自動回溯到最後一個交易日
     # 這裡透過 pd.date_range 的 freq='B' 配合 holidays 過濾來達成
 
-    start_date_str = (now - timedelta(days=250)).strftime('%Y-%m-%d')
+    start_date_str = (now - timedelta(days=320)).strftime('%Y-%m-%d')
     
     # 修正：如果今天被誤植在假日檔中，先在記憶體中排除它，確保今天能被正確抓取
     if today_str in holidays:
@@ -404,7 +404,7 @@ def main():
     
     stocks_path = os.path.join(get_script_dir(__file__), 'taiwan_stocks.csv')
     stocks = [args.stock_id] if args.stock_id else (pd.read_csv(stocks_path).iloc[:,0].astype(str).tolist() if os.path.exists(stocks_path) else ['2330'])
-
+    '''
     # --- PHASE 1: PRICE DATA (Multi-threaded by Stock) ---
     print(f"\n>>> PHASE 1: Fetching Price/Institutional/Shareholding Data (Workers: {args.workers}, API Threads: {current_api_threads})")
     print(f"      Target End Date: {price_end_date}")
@@ -430,7 +430,7 @@ def main():
             except Exception as e:
                 print(f"\n      [Error] {sid}: {e}")
     print("\n      Phase 1 Completed.")
-
+    '''
     # --- PHASE 2: MICRO DATA (Dynamic Multi-threaded) ---
     print(f"\n>>> PHASE 2: Fetching Micro Data (Workers: {args.workers}, API Threads: {current_api_threads}, Fast-Check Enabled)")
     print(f"      Target End Date: {micro_end_date}")
