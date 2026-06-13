@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 backtest_momentum_day_trading.py
-三模式版：VOLATILITY, SCALPING, LOW_ENTRY (低位潛伏)
+牛市衝鋒版：放寬進場、極速停損、利潤奔跑
 目標：超越 0050 漲幅 (25%+)
 """
 
@@ -28,10 +28,10 @@ except Exception:
 DEFAULT_WEIGHTS = {
     'WEIGHT_GAIN': 40, 'WEIGHT_VOLUME': 10, 'WEIGHT_FOREIGN': 10,
     'WEIGHT_SITC': 10, 'WEIGHT_VCP': 10, 'WEIGHT_BREAKOUT': 10,
-    'WEIGHT_HANDOVER': 40, 'MIN_SCORE_TO_PRINT': 60, 'MIN_TRADING_VALUE': 20000000,
+    'WEIGHT_HANDOVER': 40, 'MIN_SCORE_TO_PRINT': 60, 'MIN_TRADING_VALUE': 30000000,
 }
 
-# 三模式設定
+# 四模式設定
 STRATEGY_MODES = {
     'VOLATILITY': {
         'RISK_LIMIT': 0.60,
@@ -48,13 +48,10 @@ STRATEGY_MODES = {
         'BREAK_EVEN_TRIGGER': 0.03,
         'MIN_RISK_RATIO': 0.40
     },
-    'LOW_ENTRY': {
-        'RISK_LIMIT': 0.30,
-        'MIN_CONCENTRATION': 0.03,
-        'STOP_LOSS': -0.05,
-        'TAKE_PROFIT': 9.99,
-        'BREAK_EVEN_TRIGGER': 0.08,
-        'MAX_MOMENTUM': 45
+    'WASH_OUT_DIP': {
+        'STOP_LOSS': -0.03,
+        'TAKE_PROFIT': 0.05,
+        'HOLD_DAYS': 2
     }
 }
 
@@ -144,8 +141,7 @@ def check_price_volume_alignment(sid, date, data):
     total_vol = price_info.get('Trading_Volume', 0)
     if total_vol <= 0: return {'concentration': 0, 'is_aligned': False}
     concentration = sum([abs(t.get('net', 0)) for t in top_buyers[:5] if t.get('net', 0) > 0]) / total_vol
-    open_p = price_info.get('open', 0)
-    gain = (price_info.get('close', 0) - open_p) / open_p if open_p > 0 else 0
+    gain = (price_info.get('close', 0) - price_info.get('open', 0)) / price_info.get('open', 1)
     is_aligned = not ((gain > 0.05 and concentration < 0.01) or (concentration > 0.20 and gain < -0.02))
     return {'concentration': concentration, 'is_aligned': is_aligned}
 
@@ -160,16 +156,31 @@ def calculate_day_trader_risk(sid, date, data, micro_features):
         if bid in micro_features and micro_features[bid].get('穩重指數', 0) < -50: dt_vol += qty
     return dt_vol / total_vol if total_vol > 0 else 0
 
-def decide_buy(momentum_score, dt_signal, risk_ratio, is_winner_buying, pv_alignment, mode='VOLATILITY'):
+def decide_buy(momentum_score, dt_signal, risk_ratio, is_winner_buying, pv_alignment, mode='VOLATILITY', sid=None, date=None, data=None):
     concentration = pv_alignment['concentration'] if pv_alignment else 0
     
-    if mode == 'LOW_ENTRY':
-        if momentum_score < STRATEGY_MODES['LOW_ENTRY']['MAX_MOMENTUM'] and is_winner_buying and concentration > 0.04:
-            return True, 'LOW_ENTRY_ACCUMULATION'
+    # 1. WASH_OUT_DIP 模式：隔日沖倒貨後的低吸
+    if mode == 'WASH_OUT_DIP' and sid and date and data:
+        stock_info = data.get(sid, {})
+        price_data = stock_info.get('price', {})
+        sorted_dates = sorted(price_data.keys())
+        if date in sorted_dates:
+            idx = sorted_dates.index(date)
+            if idx > 0:
+                prev_date = sorted_dates[idx-1]
+                prev_price = price_data[prev_date]
+                curr_price = price_data[date]
+                # 條件：昨日大漲 (>7%) 且今日回測昨日收盤價附近 (開高走低洗盤)
+                prev_gain = (prev_price['close'] - prev_price['open']) / prev_price['open'] if prev_price['open'] > 0 else 0
+                # 修正：SQL 載入的價格欄位名為 'min' 而非 'low'
+                if prev_gain > 0.07 and curr_price['min'] <= prev_price['close'] * 1.01:
+                    return True, 'WASHOUT_DIP_BUY'
         return False, None
 
+    # 2. 基礎過濾
     if concentration < 0.01: return False, None
     if risk_ratio > 0.60: return False, None
+    
     if is_winner_buying and momentum_score > 50: return True, 'BULL_CHARGE'
     if momentum_score >= 75: return True, 'MOMENTUM_FOLLOW'
     return False, None
@@ -223,7 +234,7 @@ def run_backtest():
     all_dates = sorted(list(set(d for sid in data for d in data[sid].get('price', {}))))
     start_idx = all_dates.index(next(d for d in all_dates if d >= start_date))
     
-    cash = 2000000; portfolio = {}; transactions = []; top_n = 15 # 擴大持股，全額參與牛市
+    cash = 2000000; portfolio = {}; transactions = []; top_n = 10
     
     print(f"開始回測: {all_dates[start_idx]} -> {all_dates[-1]}")
     for idx in range(start_idx, len(all_dates)):
@@ -235,30 +246,18 @@ def run_backtest():
             gain = (curr_p - pos['avg_price']) / pos['avg_price']
             if 'max_gain' not in pos or gain > pos['max_gain']: pos['max_gain'] = gain
             
-            mode = pos['mode']; params = STRATEGY_MODES.get(mode, STRATEGY_MODES['VOLATILITY'])
+            mode = pos['mode']; params = STRATEGY_MODES[mode]
             sell_reason = None; sell_ratio = 1.0
             
-            # 1. 階梯式分批出場邏輯 (優化：取消 30% 全清，改為動態移動停損)
-            if mode in ['VOLATILITY', 'LOW_ENTRY']:
-                # 第一階段：10% 減碼一半，鎖定基本利潤
-                if not pos.get('half_sold') and gain >= 0.10:
-                    sell_reason = f"分批減碼({mode}) (+10%)"
-                    sell_ratio = 0.5
-                    pos['half_sold'] = True
+            if mode == 'VOLATILITY' and not pos.get('half_sold') and gain >= 0.10:
+                sell_reason = "分批減碼(+10%)"; sell_ratio = 0.5; pos['half_sold'] = True
             
             if not sell_reason:
-                # 移動停損保護 (獲利越高，停損越緊，鎖住大波段)
-                trailing_limit = 0.08
-                if gain > 0.30: trailing_limit = 0.05 # 獲利超過 30%，回落 5% 就跑
-                if gain > 0.50: trailing_limit = 0.03 # 獲利超過 50%，回落 3% 就跑
-                
-                if gain < (pos['max_gain'] - trailing_limit):
-                    sell_reason = f"移動停損({mode})"
-                elif gain <= -0.10:
-                    sell_reason = "停損"
+                if gain < (pos['max_gain'] - 0.08): sell_reason = "移動停損"
+                elif gain <= -0.10: sell_reason = "停損"
             
             if mode == 'SCALPING': max_days = 1
-            elif mode == 'LOW_ENTRY': max_days = 40
+            elif mode == 'WASH_OUT_DIP': max_days = 2
             else: max_days = (30 if pos.get('half_sold') else 10)
             
             if not sell_reason and (idx - all_dates.index(pos['buy_date'])) >= max_days: sell_reason = "到期"
@@ -274,31 +273,12 @@ def run_backtest():
 
         if len(portfolio) < top_n:
             analysis_date = all_dates[idx-1]
-            
-            # 1. 找出當日熱門產業 (Top 3) - 讓市場決定
-            sector_scores = defaultdict(list)
-            for sid, details in data.items():
-                if analysis_date not in details['price']: continue
-                p_data = details['price']; sorted_d = sorted(p_data.keys()); a_idx = sorted_d.index(analysis_date)
-                if a_idx < 20: continue
-                start_p = p_data[sorted_d[a_idx-20]]['close']
-                if start_p <= 0: continue
-                gain_20 = (p_data[analysis_date]['close'] - start_p) / start_p
-                ind = stock_industries.get(sid, "其他")
-                if ind == "其他": continue
-                sector_scores[ind].append(gain_20)
-            
-            # 計算產業平均漲幅並取 Top 5 (牛市中放寬產業限制，確保資金利用率)
-            avg_sector_gain = {ind: sum(gains)/len(gains) for ind, gains in sector_scores.items() if len(gains) >= 3}
-            top_sectors = sorted(avg_sector_gain.items(), key=lambda x: x[1], reverse=True)[:5]
-            top_sector_names = [x[0] for x in top_sectors]
-            
             candidates = []
             for sid, details in data.items():
                 if sid in portfolio or analysis_date not in details['price'] or current_date not in details['price']: continue
                 
                 industry = stock_industries.get(sid, "")
-                if industry not in top_sector_names: continue
+                if "半導體" not in industry: continue
                 
                 p_data = details['price']; sorted_d = sorted(p_data.keys()); a_idx = sorted_d.index(analysis_date)
                 if a_idx < 20: continue
@@ -306,6 +286,7 @@ def run_backtest():
                 start_p = p_data[sorted_d[a_idx-20]]['close']
                 if start_p <= 0: continue
                 gain_20 = (p_data[analysis_date]['close'] - start_p) / start_p
+                if gain_20 < 0.05: continue
                 
                 vcp_ok, vcp_s = check_vcp_pattern(p_data, sorted_d, a_idx)
                 hand_ok, hand_s = check_handover_consolidation(p_data, sorted_d, a_idx)
@@ -325,12 +306,19 @@ def run_backtest():
                 if top_b and str(top_b[0].get('trader','')).split('/')[-1] in micro_features:
                     if micro_features[str(top_b[0].get('trader','')).split('/')[-1]].get('穩重指數', 0) > 15: is_winner = True
                 
-                if score < STRATEGY_MODES['LOW_ENTRY']['MAX_MOMENTUM'] and is_winner:
-                    mode = 'LOW_ENTRY'
-                else:
-                    mode = 'SCALPING' if risk_ratio > 0.40 else 'VOLATILITY'
+                # 模式判定邏輯
+                is_washout = False
+                p_data = details['price']; sorted_d = sorted(p_data.keys()); a_idx = sorted_d.index(analysis_date)
+                if a_idx > 0:
+                    prev_d = sorted_d[a_idx-1]
+                    # 檢查昨日是否為隔日沖大買
+                    prev_risk = calculate_day_trader_risk(sid, prev_d, data, micro_features)
+                    if prev_risk > 0.45: is_washout = True
                 
-                buy, strat = decide_buy(score, dt_sig, risk_ratio, is_winner, pv_align, mode=mode)
+                if is_washout: mode = 'WASH_OUT_DIP'
+                else: mode = 'SCALPING' if risk_ratio > 0.40 else 'VOLATILITY'
+                
+                buy, strat = decide_buy(score, dt_sig, risk_ratio, is_winner, pv_align, mode=mode, sid=sid, date=analysis_date, data=data)
                 if buy: candidates.append({'sid': sid, 'score': score, 'mode': mode, 'price': p_data[current_date]['open']})
             
             candidates.sort(key=lambda x: x['score'], reverse=True)
@@ -350,7 +338,7 @@ def run_backtest():
     os.makedirs(RESULT_DIR, exist_ok=True)
     log_path = os.path.join(RESULT_DIR, "transaction_log.txt")
     with open(log_path, 'w', encoding='utf-8') as f:
-        f.write(f"=== 交易流水帳 (3月至今 - 三模式版) ===\n")
+        f.write(f"=== 交易流水帳 (3月至今 - 半導體鎖定) ===\n")
         f.write(f"起始資金: 2,000,000 | 最終價值: {final_v:,.0f}\n")
         f.write("-" * 80 + "\n")
         f.write(f"{'日期':<12} | {'代號':<6} | {'動作':<4} | {'價格':<8} | {'獲利':<8} | {'原因':<20}\n")
