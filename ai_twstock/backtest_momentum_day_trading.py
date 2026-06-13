@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 backtest_momentum_day_trading.py
-牛市衝鋒版：放寬進場、極速停損、利潤奔跑
+五模式精準版：HOLY_GRAIL, LOW_ENTRY, WASH_OUT_DIP, SCALPING, VOLATILITY
 目標：超越 0050 漲幅 (25%+)
 """
 
@@ -31,14 +31,21 @@ DEFAULT_WEIGHTS = {
     'WEIGHT_HANDOVER': 40, 'MIN_SCORE_TO_PRINT': 60, 'MIN_TRADING_VALUE': 30000000,
 }
 
-# 四模式設定
+# 五模式設定
 STRATEGY_MODES = {
+    'HOLY_GRAIL_BREAKOUT': {
+        'STOP_LOSS': -0.04,
+        'TAKE_PROFIT': 0.15,
+        'BREAK_EVEN_TRIGGER': 0.06,
+        'HOLD_DAYS': 10
+    },
     'VOLATILITY': {
         'RISK_LIMIT': 0.60,
         'MIN_CONCENTRATION': 0.01,
         'STOP_LOSS': -0.08,
         'TAKE_PROFIT': 9.99,
-        'BREAK_EVEN_TRIGGER': 0.05
+        'BREAK_EVEN_TRIGGER': 0.05,
+        'HOLD_DAYS': 10
     },
     'SCALPING': {
         'RISK_LIMIT': 1.0,
@@ -46,7 +53,17 @@ STRATEGY_MODES = {
         'STOP_LOSS': -0.03,
         'TAKE_PROFIT': 0.06,
         'BREAK_EVEN_TRIGGER': 0.03,
-        'MIN_RISK_RATIO': 0.40
+        'MIN_RISK_RATIO': 0.40,
+        'HOLD_DAYS': 1
+    },
+    'LOW_ENTRY': {
+        'RISK_LIMIT': 0.30,
+        'MIN_CONCENTRATION': 0.03,
+        'STOP_LOSS': -0.05,
+        'TAKE_PROFIT': 9.99,
+        'BREAK_EVEN_TRIGGER': 0.08,
+        'MAX_MOMENTUM': 45,
+        'HOLD_DAYS': 40
     },
     'WASH_OUT_DIP': {
         'STOP_LOSS': -0.03,
@@ -60,7 +77,7 @@ DB_PATH = r"C:\jupyter_notebook\ai_twstock\data\SQL_DB\taiwan_stock_micro.db"
 RESULT_DIR = r"C:\jupyter_notebook\ai_twstock\backtest_micro_simulate\v1\result"
 
 # =================================================================
-# 核心動能邏輯
+# 核心邏輯
 # =================================================================
 
 def check_vcp_pattern(price_data, sorted_dates, idx):
@@ -104,10 +121,6 @@ def calculate_momentum_score(details, weights=DEFAULT_WEIGHTS):
     score += (details['handover_score'] if details['handover_ok'] else 0) * weights['WEIGHT_HANDOVER'] / 100
     return score
 
-# =================================================================
-# 券商分點邏輯
-# =================================================================
-
 def calculate_day_trading_signal(sid, date, data, micro_features):
     stock_info = data.get(sid, {})
     report = stock_info.get('trading_daily_report', {}).get(date, {})
@@ -137,13 +150,14 @@ def check_price_volume_alignment(sid, date, data):
     stock_info = data.get(sid, {})
     price_info = stock_info.get('price', {}).get(date, {})
     top_buyers = stock_info.get('trading_daily_report', {}).get(date, {}).get('top_buyers', [])
-    if not top_buyers or not price_info: return {'concentration': 0, 'is_aligned': False}
+    if not top_buyers or not price_info: return {'concentration': 0, 'is_aligned': False, 'gain': 0}
     total_vol = price_info.get('Trading_Volume', 0)
-    if total_vol <= 0: return {'concentration': 0, 'is_aligned': False}
+    if total_vol <= 0: return {'concentration': 0, 'is_aligned': False, 'gain': 0}
     concentration = sum([abs(t.get('net', 0)) for t in top_buyers[:5] if t.get('net', 0) > 0]) / total_vol
-    gain = (price_info.get('close', 0) - price_info.get('open', 0)) / price_info.get('open', 1)
+    open_p = price_info.get('open', 0)
+    gain = (price_info.get('close', 0) - open_p) / open_p if open_p > 0 else 0
     is_aligned = not ((gain > 0.05 and concentration < 0.01) or (concentration > 0.20 and gain < -0.02))
-    return {'concentration': concentration, 'is_aligned': is_aligned}
+    return {'concentration': concentration, 'is_aligned': is_aligned, 'gain': gain}
 
 def calculate_day_trader_risk(sid, date, data, micro_features):
     top_buyers = data.get(sid, {}).get('trading_daily_report', {}).get(date, {}).get('top_buyers', [])
@@ -156,10 +170,38 @@ def calculate_day_trader_risk(sid, date, data, micro_features):
         if bid in micro_features and micro_features[bid].get('穩重指數', 0) < -50: dt_vol += qty
     return dt_vol / total_vol if total_vol > 0 else 0
 
+def check_first_breakout(sid, date, data):
+    stock_info = data.get(sid, {})
+    price_data = stock_info.get('price', {})
+    sorted_dates = sorted(price_data.keys())
+    if date not in sorted_dates: return False, 0
+    idx = sorted_dates.index(date)
+    if idx < 20: return False, 0
+    lookback = sorted_dates[idx-20:idx]
+    max_p_20 = max([price_data[d]['close'] for d in lookback])
+    avg_vol_20 = sum([price_data[d].get('Trading_Volume', 0) for d in lookback]) / 20
+    curr_p = price_data[date]['close']
+    curr_vol = price_data[date].get('Trading_Volume', 0)
+    open_p = price_data[date].get('open', 0)
+    gain = (curr_p - open_p) / open_p if open_p > 0 else 0
+    return curr_p > max_p_20 and curr_vol > (avg_vol_20 * 2.5) and gain > 0.04, gain
+
 def decide_buy(momentum_score, dt_signal, risk_ratio, is_winner_buying, pv_alignment, mode='VOLATILITY', sid=None, date=None, data=None):
     concentration = pv_alignment['concentration'] if pv_alignment else 0
     
-    # 1. WASH_OUT_DIP 模式：隔日沖倒貨後的低吸
+    if sid and date and data:
+        is_breakout, _ = check_first_breakout(sid, date, data)
+        report = data.get(sid, {}).get('trading_daily_report', {}).get(date, {})
+        top_b = report.get('top_buyers', [])
+        price_info = data[sid]['price'][date]
+        total_vol = price_info.get('Trading_Volume', 0)
+        
+        if is_breakout and top_b and total_vol > 0:
+            top_buy_qty = abs(top_b[0].get('net', 0))
+            # 買一強度：買一分點買超佔總成交量 10% 以上
+            if top_buy_qty / total_vol > 0.10:
+                return True, 'HOLY_GRAIL_BREAKOUT'
+
     if mode == 'WASH_OUT_DIP' and sid and date and data:
         stock_info = data.get(sid, {})
         price_data = stock_info.get('price', {})
@@ -170,17 +212,18 @@ def decide_buy(momentum_score, dt_signal, risk_ratio, is_winner_buying, pv_align
                 prev_date = sorted_dates[idx-1]
                 prev_price = price_data[prev_date]
                 curr_price = price_data[date]
-                # 條件：昨日大漲 (>7%) 且今日回測昨日收盤價附近 (開高走低洗盤)
                 prev_gain = (prev_price['close'] - prev_price['open']) / prev_price['open'] if prev_price['open'] > 0 else 0
-                # 修正：SQL 載入的價格欄位名為 'min' 而非 'low'
                 if prev_gain > 0.07 and curr_price['min'] <= prev_price['close'] * 1.01:
                     return True, 'WASHOUT_DIP_BUY'
         return False, None
 
-    # 2. 基礎過濾
+    if mode == 'LOW_ENTRY':
+        if momentum_score < STRATEGY_MODES['LOW_ENTRY']['MAX_MOMENTUM'] and is_winner_buying and concentration > 0.04:
+            return True, 'LOW_ENTRY_ACCUMULATION'
+        return False, None
+
     if concentration < 0.01: return False, None
     if risk_ratio > 0.60: return False, None
-    
     if is_winner_buying and momentum_score > 50: return True, 'BULL_CHARGE'
     if momentum_score >= 75: return True, 'MOMENTUM_FOLLOW'
     return False, None
@@ -218,7 +261,7 @@ def load_all_data(db_path, start_date):
         sid, date = row['stock_id'], row['date']
         if sid not in data: continue
         if date not in data[sid]['trading_daily_report']: data[sid]['trading_daily_report'][date] = {'top_buyers': [], 'top_sellers': []}
-        item = {'trader': f"{row['trader_name']}/{row['trader_id']}", 'net': row['net_qty'] if row['is_buy'] else -row['net_qty']}
+        item = {'trader': f"{row['trader_name']}/{row['trader_id']}", 'net': row['net_qty'] if row['is_buy'] else -row['net_qty'], 'avg_p': row['avg_price']}
         if row['is_buy']: data[sid]['trading_daily_report'][date]['top_buyers'].append(item)
         else: data[sid]['trading_daily_report'][date]['top_sellers'].append(item)
     conn.close(); return data
@@ -246,21 +289,23 @@ def run_backtest():
             gain = (curr_p - pos['avg_price']) / pos['avg_price']
             if 'max_gain' not in pos or gain > pos['max_gain']: pos['max_gain'] = gain
             
-            mode = pos['mode']; params = STRATEGY_MODES[mode]
+            mode = pos['mode']; params = STRATEGY_MODES.get(mode, STRATEGY_MODES['VOLATILITY'])
             sell_reason = None; sell_ratio = 1.0
             
-            if mode == 'VOLATILITY' and not pos.get('half_sold') and gain >= 0.10:
-                sell_reason = "分批減碼(+10%)"; sell_ratio = 0.5; pos['half_sold'] = True
+            if mode in ['VOLATILITY', 'LOW_ENTRY', 'HOLY_GRAIL_BREAKOUT'] and not pos.get('half_sold') and gain >= 0.10:
+                sell_reason = f"分批減碼({mode}) (+10%)"; sell_ratio = 0.5; pos['half_sold'] = True
             
             if not sell_reason:
-                if gain < (pos['max_gain'] - 0.08): sell_reason = "移動停損"
-                elif gain <= -0.10: sell_reason = "停損"
+                trailing_limit = 0.08
+                if gain > 0.30: trailing_limit = 0.05
+                if gain > 0.50: trailing_limit = 0.03
+                if gain < (pos['max_gain'] - trailing_limit): sell_reason = f"移動停損({mode})"
+                elif gain <= params['STOP_LOSS']: sell_reason = f"停損({mode})"
+                elif pos.get('max_gain', 0) > params.get('BREAK_EVEN_TRIGGER', 0.05) and gain < 0.02: sell_reason = f"保本({mode})"
             
-            if mode == 'SCALPING': max_days = 1
-            elif mode == 'WASH_OUT_DIP': max_days = 2
-            else: max_days = (30 if pos.get('half_sold') else 10)
-            
-            if not sell_reason and (idx - all_dates.index(pos['buy_date'])) >= max_days: sell_reason = "到期"
+            max_days = params.get('HOLD_DAYS', 10)
+            if mode == 'VOLATILITY' and pos.get('half_sold'): max_days = 30
+            if not sell_reason and (idx - all_dates.index(pos['buy_date'])) >= max_days: sell_reason = f"到期({mode})"
             
             if sell_reason:
                 qty = int(pos['shares'] * sell_ratio)
@@ -273,98 +318,103 @@ def run_backtest():
 
         if len(portfolio) < top_n:
             analysis_date = all_dates[idx-1]
-            candidates = []
+            sector_scores = defaultdict(list)
             for sid, details in data.items():
-                if sid in portfolio or analysis_date not in details['price'] or current_date not in details['price']: continue
-                
-                industry = stock_industries.get(sid, "")
-                if "半導體" not in industry: continue
-                
+                if analysis_date not in details['price']: continue
                 p_data = details['price']; sorted_d = sorted(p_data.keys()); a_idx = sorted_d.index(analysis_date)
                 if a_idx < 20: continue
-                
                 start_p = p_data[sorted_d[a_idx-20]]['close']
                 if start_p <= 0: continue
                 gain_20 = (p_data[analysis_date]['close'] - start_p) / start_p
-                if gain_20 < 0.05: continue
+                ind = stock_industries.get(sid, "其他")
+                if ind != "其他": sector_scores[ind].append(gain_20)
+            
+            avg_sector_gain = {ind: sum(gains)/len(gains) for ind, gains in sector_scores.items() if len(gains) >= 5}
+            top_sector_names = [x[0] for x in sorted(avg_sector_gain.items(), key=lambda x: x[1], reverse=True)[:3]]
+            
+            candidates = []
+            for sid, details in data.items():
+                if sid in portfolio or analysis_date not in details['price'] or current_date not in details['price']: continue
+                if stock_industries.get(sid) not in top_sector_names: continue
                 
+                p_data = details['price']; sorted_d = sorted(p_data.keys()); a_idx = sorted_d.index(analysis_date)
+                start_p = p_data[sorted_d[a_idx-20]]['close']
+                gain_20 = (p_data[analysis_date]['close'] - start_p) / start_p if start_p > 0 else 0
                 vcp_ok, vcp_s = check_vcp_pattern(p_data, sorted_d, a_idx)
                 hand_ok, hand_s = check_handover_consolidation(p_data, sorted_d, a_idx)
                 inst = details['institutional'].get(analysis_date, {})
                 f_net = inst.get('Foreign_Investor', {}).get('buy', 0)
                 s_net = inst.get('Investment_Trust', {}).get('buy', 0)
-                
                 mom_details = {'gain': gain_20, 'vol_ratio': 1.5, 'foreign_days': 3 if f_net > 0 else 0, 'sitc_ratio': 1.2 if s_net > 0 else 0, 'vcp_ok': vcp_ok, 'vcp_score': vcp_s, 'handover_ok': hand_ok, 'handover_score': hand_s}
                 score = calculate_momentum_score(mom_details)
-                
                 dt_sig = calculate_day_trading_signal(sid, analysis_date, data, micro_features)
                 risk_ratio = calculate_day_trader_risk(sid, analysis_date, data, micro_features)
                 pv_align = check_price_volume_alignment(sid, analysis_date, data)
                 
                 is_winner = False
-                top_b = details['trading_daily_report'].get(analysis_date, {}).get('top_buyers', [])
-                if top_b and str(top_b[0].get('trader','')).split('/')[-1] in micro_features:
-                    if micro_features[str(top_b[0].get('trader','')).split('/')[-1]].get('穩重指數', 0) > 15: is_winner = True
+                top_b_list = details['trading_daily_report'].get(analysis_date, {}).get('top_buyers', [])
+                if top_b_list and str(top_b_list[0].get('trader','')).split('/')[-1] in micro_features:
+                    if micro_features[str(top_b_list[0].get('trader','')).split('/')[-1]].get('穩重指數', 0) > 15: is_winner = True
                 
-                # 模式判定邏輯
+                day_trader_hubs = ['美林', '凱基-台北', '富邦-建國', '元大-土城永寧', '群益金鼎-大安']
+                hub_count = 0
+                for tb in top_b_list[:3]:
+                    t_name = str(tb.get('trader', '')).split('/')[0].strip()
+                    if any(hub in t_name for hub in day_trader_hubs): hub_count += 1
+                
                 is_washout = False
-                p_data = details['price']; sorted_d = sorted(p_data.keys()); a_idx = sorted_d.index(analysis_date)
                 if a_idx > 0:
-                    prev_d = sorted_d[a_idx-1]
-                    # 檢查昨日是否為隔日沖大買
-                    prev_risk = calculate_day_trader_risk(sid, prev_d, data, micro_features)
+                    prev_risk = calculate_day_trader_risk(sid, sorted_d[a_idx-1], data, micro_features)
                     if prev_risk > 0.45: is_washout = True
                 
-                if is_washout: mode = 'WASH_OUT_DIP'
+                if is_washout or hub_count >= 2: mode = 'WASH_OUT_DIP'
                 else: mode = 'SCALPING' if risk_ratio > 0.40 else 'VOLATILITY'
                 
                 buy, strat = decide_buy(score, dt_sig, risk_ratio, is_winner, pv_align, mode=mode, sid=sid, date=analysis_date, data=data)
-                if buy: candidates.append({'sid': sid, 'score': score, 'mode': mode, 'price': p_data[current_date]['open']})
+                if buy:
+                    # 聖盃訊號具備最高統計優先權
+                    final_mode = 'HOLY_GRAIL_BREAKOUT' if strat == 'HOLY_GRAIL_BREAKOUT' else mode
+                    # 修正：確保 strategy 被正確傳遞
+                    candidates.append({'sid': sid, 'score': score, 'mode': final_mode, 'price': p_data[current_date]['open'], 'strategy': strat or 'MOMENTUM'})
             
             candidates.sort(key=lambda x: x['score'], reverse=True)
             for cand in candidates[:top_n - len(portfolio)]:
                 buy_price = cand['price']
-                shares = int((cash / (top_n - len(portfolio)) * 0.95) / buy_price / 1000) * 1000
+                if buy_price <= 0: continue
+                num_to_buy = top_n - len(portfolio)
+                shares = int((cash / num_to_buy * 0.95) / buy_price / 1000) * 1000
                 if shares >= 1000:
                     cost = shares * buy_price * 1.002
                     if cash >= cost:
                         cash -= cost
-                        portfolio[cand['sid']] = {'shares': shares, 'avg_price': buy_price, 'buy_date': current_date, 'mode': cand['mode']}
-                        transactions.append({'date': current_date, 'sid': cand['sid'], 'action': 'BUY', 'price': buy_price, 'mode': cand['mode']})
+                        portfolio[cand['sid']] = {'shares': shares, 'avg_price': buy_price, 'buy_date': current_date, 'mode': cand['mode'], 'strategy': cand.get('strategy', 'MOMENTUM')}
+                        transactions.append({'date': current_date, 'sid': cand['sid'], 'action': 'BUY', 'price': buy_price, 'mode': cand['mode'], 'strategy': cand.get('strategy', 'MOMENTUM')})
 
     final_v = cash + sum(p['shares'] * data[s]['price'][all_dates[-1]]['close'] for s, p in portfolio.items() if all_dates[-1] in data[s]['price'])
-    
     all_sells = [t for t in transactions if t['action'] == 'SELL']
     mode_stats = {}
     for m in STRATEGY_MODES.keys():
         m_sells = [t for t in all_sells if t.get('mode') == m]
         m_gains = [t['gain'] for t in m_sells]
-        mode_stats[m] = {
-            'count': len(m_sells),
-            'win_rate': len([g for g in m_gains if g > 0]) / len(m_gains) if m_gains else 0,
-            'avg_return': sum(m_gains) / len(m_gains) if m_gains else 0
-        }
+        mode_stats[m] = {'count': len(m_sells), 'win_rate': len([g for g in m_gains if g > 0]) / len(m_gains) if m_gains else 0, 'avg_return': sum(m_gains) / len(m_gains) if m_gains else 0}
 
     print(f"\n回測結束! 最終價值: {final_v:,.0f} (報酬率: {(final_v-2000000)/2000000:.1%})")
     print("\n" + "="*60)
-    print(f"{'模式':<15} | {'交易次數':<8} | {'勝率':<8} | {'平均報酬':<10}")
+    print(f"{'模式':<20} | {'交易次數':<8} | {'勝率':<8} | {'平均報酬':<10}")
     print("-" * 60)
     for m, s in mode_stats.items():
-        print(f"{m:<15} | {s['count']:>8} | {s['win_rate']:>8.1%} | {s['avg_return']:>10.2%}")
+        print(f"{m:<20} | {s['count']:>8} | {s['win_rate']:>8.1%} | {s['avg_return']:>10.2%}")
     print("="*60)
     
     os.makedirs(RESULT_DIR, exist_ok=True)
     log_path = os.path.join(RESULT_DIR, "transaction_log.txt")
     with open(log_path, 'w', encoding='utf-8') as f:
-        f.write(f"=== 交易流水帳 (3月至今 - 四模式版) ===\n")
+        f.write(f"=== 交易流水帳 (3月至今 - 五模式精準版) ===\n")
         f.write(f"起始資金: 2,000,000 | 最終價值: {final_v:,.0f}\n")
-        f.write("-" * 80 + "\n")
-        f.write(f"{'日期':<12} | {'代號':<6} | {'動作':<4} | {'價格':<8} | {'獲利':<8} | {'原因':<20}\n")
         f.write("-" * 80 + "\n")
         for t in transactions:
             gain_str = f"{t.get('gain', 0):.1%}" if t['action'] == 'SELL' else "-"
             f.write(f"{t['date']:<12} | {t['sid']:<6} | {t['action']:<4} | {t.get('price', 0):<8.2f} | {gain_str:<8} | {t.get('reason', ''):<20}\n")
-    print(f"交易流水帳已匯出至: {log_path}")
 
 if __name__ == "__main__":
     run_backtest()
