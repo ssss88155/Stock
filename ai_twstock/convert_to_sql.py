@@ -33,9 +33,11 @@ def create_db(db_path):
         )
     ''')
     
+    # 修正：不再這裡 commit DELETE，讓它留在事務中
+    # 這樣如果後續匯入失敗，rollback 就能救回舊資料
     cursor.execute('DELETE FROM daily_prices')
     cursor.execute('DELETE FROM broker_details')
-    conn.commit()
+    
     return conn
 
 def import_prices(conn, json_path):
@@ -79,7 +81,6 @@ def import_prices(conn, json_path):
         
         if batch_data:
             cursor.executemany('INSERT OR REPLACE INTO daily_prices VALUES (?,?,?,?,?,?,?,?,?,?)', batch_data)
-    conn.commit()
 
 def import_brokers_streaming(conn, json_path):
     print(f"正在以串流方式匯入分點資料: {json_path}")
@@ -112,12 +113,10 @@ def import_brokers_streaming(conn, json_path):
                         
                         if len(batch_data) >= batch_size:
                             cursor.executemany('INSERT OR REPLACE INTO broker_details VALUES (?,?,?,?,?,?,?)', batch_data)
-                            conn.commit()
                             batch_data = []
                             print(f"已處理 {stock_count} 檔股票，累計寫入 {total_count} 筆...")
         if batch_data:
             cursor.executemany('INSERT OR REPLACE INTO broker_details VALUES (?,?,?,?,?,?,?)', batch_data)
-            conn.commit()
     print(f"分點資料匯入完成！共 {total_count} 筆。")
 
 def finalize_db(conn):
@@ -133,6 +132,7 @@ def finalize_db(conn):
     print("正在更新統計資訊 (ANALYZE)...")
     cursor.execute('ANALYZE')
     
+    # 這裡才進行最終 commit，確保 DELETE + 所有 INSERT + INDEX 都在同一個事務中
     conn.commit()
     
     print("正在執行資料叢集化與壓縮 (VACUUM)...")
@@ -158,8 +158,10 @@ if __name__ == "__main__":
         finalize_db(conn)
         print(f"\n轉換完成！總耗時: {time.time() - start_time:.2f} 秒")
     except Exception as e:
-        if conn: conn.rollback()
-        print(f"\n發生致命錯誤: {e}")
+        if conn: 
+            print(f"\n偵測到錯誤，正在執行 Rollback 以保護舊資料...")
+            conn.rollback()
+        print(f"發生致命錯誤: {e}")
         sys.exit(1)
     finally:
         if conn: conn.close()
