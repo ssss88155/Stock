@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 backtest_momentum_day_trading.py
-牛市衝鋒版：放寬進場、極速停損、利潤奔跑
+三模式版：VOLATILITY, SCALPING, LOW_ENTRY (低位潛伏)
 目標：超越 0050 漲幅 (25%+)
 """
 
@@ -31,13 +31,13 @@ DEFAULT_WEIGHTS = {
     'WEIGHT_HANDOVER': 40, 'MIN_SCORE_TO_PRINT': 60, 'MIN_TRADING_VALUE': 30000000,
 }
 
-# 雙模式設定
+# 三模式設定
 STRATEGY_MODES = {
     'VOLATILITY': {
         'RISK_LIMIT': 0.60,
         'MIN_CONCENTRATION': 0.01,
         'STOP_LOSS': -0.08,
-        'TAKE_PROFIT': 9.99, # 取消固定停利
+        'TAKE_PROFIT': 9.99,
         'BREAK_EVEN_TRIGGER': 0.05
     },
     'SCALPING': {
@@ -47,6 +47,14 @@ STRATEGY_MODES = {
         'TAKE_PROFIT': 0.06,
         'BREAK_EVEN_TRIGGER': 0.03,
         'MIN_RISK_RATIO': 0.40
+    },
+    'LOW_ENTRY': {
+        'RISK_LIMIT': 0.30,
+        'MIN_CONCENTRATION': 0.03,
+        'STOP_LOSS': -0.05,
+        'TAKE_PROFIT': 9.99,
+        'BREAK_EVEN_TRIGGER': 0.08,
+        'MAX_MOMENTUM': 45
     }
 }
 
@@ -136,7 +144,8 @@ def check_price_volume_alignment(sid, date, data):
     total_vol = price_info.get('Trading_Volume', 0)
     if total_vol <= 0: return {'concentration': 0, 'is_aligned': False}
     concentration = sum([abs(t.get('net', 0)) for t in top_buyers[:5] if t.get('net', 0) > 0]) / total_vol
-    gain = (price_info.get('close', 0) - price_info.get('open', 0)) / price_info.get('open', 1)
+    open_p = price_info.get('open', 0)
+    gain = (price_info.get('close', 0) - open_p) / open_p if open_p > 0 else 0
     is_aligned = not ((gain > 0.05 and concentration < 0.01) or (concentration > 0.20 and gain < -0.02))
     return {'concentration': concentration, 'is_aligned': is_aligned}
 
@@ -153,6 +162,12 @@ def calculate_day_trader_risk(sid, date, data, micro_features):
 
 def decide_buy(momentum_score, dt_signal, risk_ratio, is_winner_buying, pv_alignment, mode='VOLATILITY'):
     concentration = pv_alignment['concentration'] if pv_alignment else 0
+    
+    if mode == 'LOW_ENTRY':
+        if momentum_score < STRATEGY_MODES['LOW_ENTRY']['MAX_MOMENTUM'] and is_winner_buying and concentration > 0.04:
+            return True, 'LOW_ENTRY_ACCUMULATION'
+        return False, None
+
     if concentration < 0.01: return False, None
     if risk_ratio > 0.60: return False, None
     if is_winner_buying and momentum_score > 50: return True, 'BULL_CHARGE'
@@ -208,7 +223,7 @@ def run_backtest():
     all_dates = sorted(list(set(d for sid in data for d in data[sid].get('price', {}))))
     start_idx = all_dates.index(next(d for d in all_dates if d >= start_date))
     
-    cash = 2000000; portfolio = {}; transactions = []; top_n = 8 # 恢復適度分散
+    cash = 2000000; portfolio = {}; transactions = []; top_n = 10
     
     print(f"開始回測: {all_dates[start_idx]} -> {all_dates[-1]}")
     for idx in range(start_idx, len(all_dates)):
@@ -220,28 +235,21 @@ def run_backtest():
             gain = (curr_p - pos['avg_price']) / pos['avg_price']
             if 'max_gain' not in pos or gain > pos['max_gain']: pos['max_gain'] = gain
             
-            mode = pos['mode']; params = STRATEGY_MODES[mode]
+            mode = pos['mode']; params = STRATEGY_MODES.get(mode, STRATEGY_MODES['VOLATILITY'])
             sell_reason = None; sell_ratio = 1.0
             
-            if mode == 'VOLATILITY' and not pos.get('half_sold') and gain >= 0.15:
-                sell_reason = "分批減碼(+15%)"; sell_ratio = 0.5; pos['half_sold'] = True
+            if mode in ['VOLATILITY', 'LOW_ENTRY'] and not pos.get('half_sold') and gain >= 0.10:
+                sell_reason = f"分批減碼({mode}) (+10%)"; sell_ratio = 0.5; pos['half_sold'] = True
             
             if not sell_reason:
-                # 精準出場：SCALPING 模式隔天開高就跑，VOLATILITY 模式嚴守移動停損
-                if mode == 'SCALPING':
-                    if gain > 0.03: sell_reason = "隔日沖獲利"
-                    elif gain < -0.02: sell_reason = "隔日沖停損"
-                else:
-                    if gain < (pos['max_gain'] - 0.07): sell_reason = "移動停損"
-                    elif gain <= -0.05: sell_reason = "停損"
+                if gain < (pos['max_gain'] - 0.08): sell_reason = "移動停損"
+                elif gain <= -0.10: sell_reason = "停損"
             
-            # 汰弱留強：3天不漲就換股
-            max_days = 1 if mode == 'SCALPING' else (30 if pos.get('half_sold') else 3)
-            if not sell_reason and (idx - all_dates.index(pos['buy_date'])) >= max_days:
-                if mode == 'VOLATILITY' and gain < 0.02:
-                    sell_reason = "汰弱留強(不漲就換)"
-                else:
-                    sell_reason = "到期"
+            if mode == 'SCALPING': max_days = 1
+            elif mode == 'LOW_ENTRY': max_days = 40
+            else: max_days = (30 if pos.get('half_sold') else 10)
+            
+            if not sell_reason and (idx - all_dates.index(pos['buy_date'])) >= max_days: sell_reason = "到期"
             
             if sell_reason:
                 qty = int(pos['shares'] * sell_ratio)
@@ -267,7 +275,6 @@ def run_backtest():
                 start_p = p_data[sorted_d[a_idx-20]]['close']
                 if start_p <= 0: continue
                 gain_20 = (p_data[analysis_date]['close'] - start_p) / start_p
-                if gain_20 < 0.05: continue
                 
                 vcp_ok, vcp_s = check_vcp_pattern(p_data, sorted_d, a_idx)
                 hand_ok, hand_s = check_handover_consolidation(p_data, sorted_d, a_idx)
@@ -287,7 +294,11 @@ def run_backtest():
                 if top_b and str(top_b[0].get('trader','')).split('/')[-1] in micro_features:
                     if micro_features[str(top_b[0].get('trader','')).split('/')[-1]].get('穩重指數', 0) > 15: is_winner = True
                 
-                mode = 'SCALPING' if risk_ratio > 0.40 else 'VOLATILITY'
+                if score < STRATEGY_MODES['LOW_ENTRY']['MAX_MOMENTUM'] and is_winner:
+                    mode = 'LOW_ENTRY'
+                else:
+                    mode = 'SCALPING' if risk_ratio > 0.40 else 'VOLATILITY'
+                
                 buy, strat = decide_buy(score, dt_sig, risk_ratio, is_winner, pv_align, mode=mode)
                 if buy: candidates.append({'sid': sid, 'score': score, 'mode': mode, 'price': p_data[current_date]['open']})
             
@@ -308,7 +319,7 @@ def run_backtest():
     os.makedirs(RESULT_DIR, exist_ok=True)
     log_path = os.path.join(RESULT_DIR, "transaction_log.txt")
     with open(log_path, 'w', encoding='utf-8') as f:
-        f.write(f"=== 交易流水帳 (3月至今 - 半導體鎖定) ===\n")
+        f.write(f"=== 交易流水帳 (3月至今 - 三模式版) ===\n")
         f.write(f"起始資金: 2,000,000 | 最終價值: {final_v:,.0f}\n")
         f.write("-" * 80 + "\n")
         f.write(f"{'日期':<12} | {'代號':<6} | {'動作':<4} | {'價格':<8} | {'獲利':<8} | {'原因':<20}\n")
