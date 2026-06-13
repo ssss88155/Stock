@@ -10,6 +10,7 @@ backtest_momentum_day_trading.py
 import json
 import os
 import sys
+import sqlite3
 from datetime import datetime
 from collections import OrderedDict, defaultdict
 
@@ -64,7 +65,8 @@ def load_micro_features() -> dict:
         try:
             with open(MICRO_FEATURE_FILE, 'r', encoding='utf-8') as f:
                 features = json.load(f)
-                return {item['id']: item for item in features}
+                # 統一代號為字串 Key，並去除可能的空白
+                return {str(item['id']).strip(): item for item in features}
         except Exception as e:
             print(f"[WARN] 載入 micro_feature 失敗: {e}")
     return {}
@@ -125,7 +127,7 @@ def calculate_day_trading_signal(sid: str, date: str, data: dict, micro_features
     inst = stock_info.get('institutional', {}).get(date, {})
     brokers = inst.get('brokers', []) or []
     for b in brokers:
-        bid = str(b.get('id', ''))
+        bid = str(b.get('id', '')).strip()
         if bid in micro_features:
             has_data = True
             stability = micro_features[bid].get('穩重指數', 0)
@@ -141,22 +143,25 @@ def calculate_day_trading_signal(sid: str, date: str, data: dict, micro_features
     for key, is_buy in [('top_buyers', True), ('top_sellers', False)]:
         traders = report.get(key, [])
         for t in traders:
-            trader_str = t.get('trader', '')
-            if '/' in trader_str:
-                bid = trader_str.split('/')[-1]
-                if bid in micro_features:
-                    has_data = True
-                    stability = micro_features[bid].get('穩重指數', 0)
-                    # 優先使用 net_s/net_b (若有)，否則用 net
-                    net = t.get('net', 0)
-                    if is_buy:
-                        qty = t.get('net_b', net)
-                        buy_total_weighted += (qty * stability / 100.0)
-                        buy_total_qty += qty
-                    else:
-                        qty = abs(t.get('net_s', net))
-                        sell_total_weighted += (qty * stability / 100.0)
-                        sell_total_qty += qty
+            trader_str = str(t.get('trader', ''))
+            # 同時支援 "名稱/代號" 或 "純代號" 格式
+            bid = trader_str.split('/')[-1] if '/' in trader_str else trader_str
+            bid_s = str(bid).strip()
+            
+            if bid_s in micro_features:
+                has_data = True
+                stability = micro_features[bid_s].get('穩重指數', 0)
+                # 強健判斷：SQL 格式會把量存在 'net'，JSON 格式可能在 'net_b'/'net_s'
+                # 注意：在 load_data_from_sql 中，賣方 net 已存為負數，這裡取絕對值作為量
+                raw_net = abs(t.get('net', 0))
+                if is_buy:
+                    qty = t.get('net_b', raw_net)
+                    buy_total_weighted += (qty * stability / 100.0)
+                    buy_total_qty += qty
+                else:
+                    qty = t.get('net_s', raw_net)
+                    sell_total_weighted += (qty * stability / 100.0)
+                    sell_total_qty += qty
 
     if not has_data:
         return {'type': None, 'strength': 0.0, 'reason': '無券商明細數據'}
@@ -173,59 +178,222 @@ def calculate_day_trading_signal(sid: str, date: str, data: dict, micro_features
     print(f"[DT DEBUG] {date} {sid} | net_score={net_score:.1f} BS_Diff={bs_diff_index:.2f} (B_Idx:{buy_idx:.2f} S_Idx:{sell_idx:.2f})")
 
     # 判斷邏輯優化：
-    # REVERSAL: 隔日沖賣出 (net_score > 10) 且 買賣指數為正 (代表買方比賣方更「穩重」)
-    if net_score > 10 and bs_diff_index > 0:
+    # REVERSAL: 隔日沖賣出 (net_score > 0) 且 買賣指數為正 (代表買方比賣方更「穩重」)
+    if net_score > 0 and bs_diff_index > 0.2:
         result = {
             'type': 'REVERSAL',
-            'strength': min(100, net_score * 2),
-            'reason': f'REVERSAL: 淨分{net_score:.1f} 且 買賣指數正向({bs_diff_index:.2f})'
+            'strength': min(100, bs_diff_index * 50),
+            'reason': f'REVERSAL: 買賣指數正向({bs_diff_index:.2f})'
         }
-    elif net_score < -10:
+    elif net_score < 0 and bs_diff_index < -0.2:
         result = {
             'type': 'FOLLOW',
-            'strength': min(100, abs(net_score) * 2),
-            'reason': f'FOLLOW: 淨分負向(隔日沖買進) {net_score:.1f}'
+            'strength': min(100, abs(bs_diff_index) * 50),
+            'reason': f'FOLLOW: 買賣指數負向({bs_diff_index:.2f})'
         }
     else:
         result = {'type': None, 'strength': 0.0, 'reason': '訊號不明顯'}
 
     return result
 
-def decide_buy(momentum_score: float, dt_signal: dict, mom_threshold: float = LOOSE_BUY_SCORE_THRESHOLD) -> tuple:
+def calculate_broker_concentration(sid: str, date: str, data: dict) -> float:
     """
-    給定動能分數 + 隔日沖訊號，決定是否買進及策略類型
+    計算分點集中度: (前5大買進分點合計買超 / 總成交量)
     """
-    if dt_signal['type'] == 'REVERSAL' and dt_signal['strength'] >= 25:
-        return True, 'REVERSAL', dt_signal['reason']
-    if dt_signal['type'] == 'FOLLOW' and dt_signal['strength'] >= 20:
+    stock_info = data.get(sid, {})
+    report = stock_info.get('trading_daily_report', {}).get(date, {})
+    top_buyers = report.get('top_buyers', [])
+    
+    if not top_buyers:
+        return 0.0
+        
+    # 取得當日總成交量 (從價格資料拿)
+    total_vol = stock_info.get('price', {}).get(date, {}).get('Trading_Volume', 0)
+    if total_vol <= 0:
+        return 0.0
+        
+    top_5_buy_sum = sum([abs(t.get('net', 0)) for t in top_buyers[:5] if t.get('net', 0) > 0])
+    return top_5_buy_sum / total_vol
+
+def check_abnormal_broker_buy(sid: str, date: str, data: dict) -> bool:
+    """
+    量價配合: 檢查今日買超第一名分點是否為異常買超 (> 20日平均 3 倍)
+    """
+    stock_info = data.get(sid, {})
+    report = stock_info.get('trading_daily_report', {}).get(date, {})
+    top_buyers = report.get('top_buyers', [])
+    
+    if not top_buyers:
+        return False
+        
+    current_top_buy = abs(top_buyers[0].get('net', 0))
+    if current_top_buy <= 0:
+        return False
+        
+    # 計算過去 20 天的平均買超第一名量
+    all_dates = sorted(list(stock_info.get('trading_daily_report', {}).keys()))
+    if date not in all_dates:
+        return False
+        
+    idx = all_dates.index(date)
+    lookback_dates = all_dates[max(0, idx-20):idx]
+    
+    past_buys = []
+    for d in lookback_dates:
+        d_report = stock_info['trading_daily_report'].get(d, {})
+        d_buyers = d_report.get('top_buyers', [])
+        if d_buyers:
+            past_buys.append(abs(d_buyers[0].get('net', 0)))
+            
+    if not past_buys:
+        return False
+        
+    avg_past_buy = sum(past_buys) / len(past_buys)
+    return current_top_buy > (avg_past_buy * 3)
+
+def calculate_day_trader_risk(sid: str, date: str, data: dict, micro_features: dict) -> float:
+    """
+    計算隔日沖風險佔比: (隔日沖分點買超量) / (前十大買超分點總量)
+    """
+    stock_info = data.get(sid, {})
+    report = stock_info.get('trading_daily_report', {}).get(date, {})
+    top_buyers = report.get('top_buyers', [])
+    if not top_buyers: return 0.0
+    
+    day_trader_buy_vol = 0
+    total_top_buy_vol = 0
+    for t in top_buyers[:10]:
+        bid = str(t.get('trader', '')).split('/')[-1].strip()
+        net_qty = abs(t.get('net', 0))
+        total_top_buy_vol += net_qty
+        if bid in micro_features and micro_features[bid].get('穩重指數', 0) < -50:
+            day_trader_buy_vol += net_qty
+    return day_trader_buy_vol / total_top_buy_vol if total_top_buy_vol > 0 else 0
+
+def decide_buy(momentum_score: float, dt_signal: dict, risk_ratio: float = 0, is_winner_buying: bool = False, mom_threshold: float = LOOSE_BUY_SCORE_THRESHOLD, use_strict_reversal: bool = True) -> tuple:
+    """
+    優化後的買進決策：整合動能、隔日沖風險與贏家行為
+    """
+    # 1. 隔日沖風險過濾 (若佔比 > 35% 則視為高風險，震盪盤需更嚴格)
+    if risk_ratio > 0.35:
+        return False, None, f'隔日沖風險過高({risk_ratio:.1%})'
+
+    # 2. 贏家加持：若贏家在買，放寬動能門檻 30% (增加對主力股的敏感度)
+    effective_threshold = mom_threshold * 0.7 if is_winner_buying else mom_threshold
+
+    # 3. 策略優先級調整
+    if dt_signal['type'] == 'REVERSAL':
+        if use_strict_reversal and '買賣指數正向' not in dt_signal['reason']:
+            return False, None, ''
+        # 增加強度要求，避免小反彈
+        if dt_signal['strength'] >= 35:
+            return True, 'REVERSAL', dt_signal['reason']
+            
+    if dt_signal['type'] == 'FOLLOW' and dt_signal['strength'] >= 30:
         return True, 'FOLLOW', dt_signal['reason']
-    if momentum_score >= mom_threshold:
-        return True, 'MOMENTUM', f'動能分數 {momentum_score:.1f}'
+        
+    if momentum_score >= effective_threshold:
+        # 如果動能極高但沒有贏家，且風險佔比中等(20-35%)，則降級或不買
+        if momentum_score < 100 and not is_winner_buying and risk_ratio > 0.2:
+             return False, None, f'動能不足以覆蓋風險(Risk:{risk_ratio:.1%})'
+             
+        reason = f'動能分數 {momentum_score:.1f}'
+        if is_winner_buying: reason += " (贏家同步)"
+        return True, 'MOMENTUM', reason
+        
     return False, None, ''
 
 # =================================================================
 # 主回測函數 (phased 第一版)
 # =================================================================
 
+def load_data_from_sql(db_path: str, target_sids: list = None):
+    """從 SQL 載入回測所需資料格式"""
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    data = {}
+    
+    # 1. 載入價格與法人
+    query = "SELECT * FROM daily_prices"
+    if target_sids:
+        placeholders = ','.join(['?'] * len(target_sids))
+        query += f" WHERE stock_id IN ({placeholders})"
+        cursor.execute(query, target_sids)
+    else:
+        cursor.execute(query)
+        
+    for row in cursor.fetchall():
+        sid = row['stock_id']
+        date = row['date']
+        if sid not in data:
+            data[sid] = {'price': {}, 'institutional': {}, 'trading_daily_report': {}}
+        
+        data[sid]['price'][date] = {
+            'open': row['open'], 'max': row['high'], 'min': row['low'], 'close': row['close'],
+            'Trading_Volume': row['volume']
+        }
+        data[sid]['institutional'][date] = {
+            'Foreign_Investor': {'buy': row['foreign_buy'], 'sell': 0},
+            'Investment_Trust': {'buy': row['sitc_buy'], 'sell': 0}
+        }
+
+    # 2. 載入分點明細
+    query = "SELECT * FROM broker_details"
+    if target_sids:
+        placeholders = ','.join(['?'] * len(target_sids))
+        query += f" WHERE stock_id IN ({placeholders})"
+        cursor.execute(query, target_sids)
+    else:
+        cursor.execute(query)
+        
+    for row in cursor.fetchall():
+        sid = row['stock_id']
+        date = row['date']
+        if sid not in data: continue
+        
+        if date not in data[sid]['trading_daily_report']:
+            data[sid]['trading_daily_report'][date] = {'top_buyers': [], 'top_sellers': []}
+        
+        # 統整為與原本 JSON 一致的格式
+        item = {
+            'trader': f"{row['trader_name']}/{row['trader_id']}",
+            'net': row['net_qty'] if row['is_buy'] else -row['net_qty'],
+            'avg_p': row['avg_price']
+        }
+        if row['is_buy']:
+            data[sid]['trading_daily_report'][date]['top_buyers'].append(item)
+        else:
+            data[sid]['trading_daily_report'][date]['top_sellers'].append(item)
+            
+    conn.close()
+    return data
+
 def run_momentum_day_trading_backtest(override_config: dict = None, silent: bool = False) -> dict:
-    """執行 動能 + 隔日沖 整合回測 (第一版，寬鬆參數讓交易發生)"""
-    print("執行 動能 + 隔日沖 整合回測 (第一版 loose)...")
+    """執行 動能 + 隔日沖 整合回測"""
+    if not silent: print("執行 動能 + 隔日沖 整合回測 (SQL 模式)...")
 
     # 1. 載入
-    # 由於 stock_data_micro.json (1.2GB) 過大導致 MemoryError，
-    # 且 analyze_momentum.py 內部使用 json.load()，
-    # 暫時切換回 stock_data.json 進行回測，以確保基礎動能邏輯能運作。
-    data = analyze_momentum.load_stock_data_wrapper('stock_data.json')
+    db_path = r"C:\jupyter_notebook\ai_twstock\data\SQL_DB\taiwan_stock_micro.db"
+    target_sids = override_config.get('TARGET_SIDS') if override_config else None
+    
+    if os.path.exists(db_path):
+        data = load_data_from_sql(db_path, target_sids)
+    else:
+        data = analyze_momentum.load_stock_data_wrapper('stock_data.json')
+        
     stock_names = load_stock_names()
     micro_features = load_micro_features()
     _config = load_config()
     if override_config:
         _config.update(override_config)
-
+    
+    use_strict_reversal = _config.get('USE_STRICT_REVERSAL', True)
     starting_cash = _config.get('STARTING_CASH', 2000000)
     weights = _config.get('WEIGHTS', DEFAULT_WEIGHTS)
 
-    # 回測期間 (寬鬆 3 個月)
+    # 回測期間
     all_dates = sorted(list(set(d for sid in data for d in data[sid].get('price', {}))))
     if not all_dates:
         return None
@@ -251,7 +419,7 @@ def run_momentum_day_trading_backtest(override_config: dict = None, silent: bool
             if current_date in data.get(sid, {}).get('price', {}):
                 portfolio_value += pos['shares'] * data[sid]['price'][current_date]['close']
 
-        # 賣出檢查 (簡單版)
+        # 賣出檢查
         to_sell = []
         for sid, pos in list(portfolio.items()):
             if current_date not in data.get(sid, {}).get('price', {}):
@@ -260,11 +428,11 @@ def run_momentum_day_trading_backtest(override_config: dict = None, silent: bool
             gain = (curr_price - pos['avg_price']) / pos['avg_price'] if pos['avg_price'] > 0 else 0
 
             sell_reason = None
-            if gain >= 0.08:  # 寬鬆獲利了結
+            if gain >= 0.08:
                 sell_reason = f"獲利了結 (+{gain:.1%})"
-            elif gain <= -0.05:  # 寬鬆停損
+            elif gain <= -0.05:
                 sell_reason = f"停損 ({gain:.1%})"
-            elif (idx - all_dates.index(pos['buy_date'])) >= 5:  # 最多持 5 天
+            elif (idx - all_dates.index(pos['buy_date'])) >= 5:
                 sell_reason = f"到期賣出 ({gain:.1%})"
 
             if sell_reason:
@@ -289,25 +457,39 @@ def run_momentum_day_trading_backtest(override_config: dict = None, silent: bool
             if not silent:
                 print(f"[{current_date}] 賣出 {sid} {shares}股 @ {price:.2f} ({reason})")
 
-        # 買進檢查 (寬鬆)
+        # 買進檢查
         if len(portfolio) < top_n:
             analysis_date = all_dates[idx-1] if idx > 0 else current_date
             start_mom = all_dates[max(0, idx-1-20)]
             mom_results = calculate_momentum_scores(data, start_mom, analysis_date, weights=weights)
 
             candidates = []
-            for r in mom_results[:50]:  # 寬鬆掃描前 50 檔
+            for r in mom_results[:50]:
                 sid = r['stock_id']
                 if sid in portfolio or current_date not in data.get(sid, {}).get('price', {}):
                     continue
                 price = data[sid]['price'][current_date]['close']
-                if price < 10:  # 寬鬆價格門檻
+                if price < 10:
                     continue
 
                 mom_score = r['score']
                 dt_sig = calculate_day_trading_signal(sid, analysis_date, data, micro_features)
+                risk_ratio = calculate_day_trader_risk(sid, analysis_date, data, micro_features)
+                
+                # 強化贏家邏輯：前五大買家是否有 3 個以上是「穩重分點」
+                is_winner_buying = False
+                report = data.get(sid, {}).get('trading_daily_report', {}).get(analysis_date, {})
+                top_buyers = report.get('top_buyers', [])
+                if len(top_buyers) >= 5:
+                    stable_count = 0
+                    for tb in top_buyers[:5]:
+                        t_bid = str(tb.get('trader', '')).split('/')[-1].strip()
+                        if t_bid in micro_features and micro_features[t_bid].get('穩重指數', 0) > 15:
+                            stable_count += 1
+                    if stable_count >= 3:
+                        is_winner_buying = True
 
-                buy, strat, reason = decide_buy(mom_score, dt_sig, mom_threshold=buy_score_threshold)
+                buy, strat, reason = decide_buy(mom_score, dt_sig, risk_ratio=risk_ratio, is_winner_buying=is_winner_buying, mom_threshold=buy_score_threshold, use_strict_reversal=use_strict_reversal)
                 if buy:
                     candidates.append({
                         'sid': sid,
@@ -318,9 +500,7 @@ def run_momentum_day_trading_backtest(override_config: dict = None, silent: bool
                         'price': price
                     })
 
-            # 排序 (動能 + dt 強度)
             candidates.sort(key=lambda x: (x['score'] + x['dt_strength']), reverse=True)
-
             available = top_n - len(portfolio)
             buy_budget = cash / max(1, available)
 
@@ -371,53 +551,12 @@ def run_momentum_day_trading_backtest(override_config: dict = None, silent: bool
     total_return = (final_value - total_invested) / total_invested
     annualized = (1 + total_return) ** (1 / years) - 1 if years > 0 else 0
 
-    # 統計 (各自買入/賣出 + 總體 + 持續跟進)
-    reversal_buys = [t for t in transactions if t['action'] == 'BUY' and t.get('strategy') == 'REVERSAL']
-    follow_buys = [t for t in transactions if t['action'] == 'BUY' and t.get('strategy') == 'FOLLOW']
-    mom_buys = [t for t in transactions if t['action'] == 'BUY' and t.get('strategy') == 'MOMENTUM']
-
+    # 統計
     reversal_sells = [t for t in transactions if t['action'] == 'SELL' and t.get('strategy') == 'REVERSAL']
-    follow_sells = [t for t in transactions if t['action'] == 'SELL' and t.get('strategy') == 'FOLLOW']
-    mom_sells = [t for t in transactions if t['action'] == 'SELL' and t.get('strategy') == 'MOMENTUM']
-
     rev_gains = [t['gain'] for t in reversal_sells]
-    fol_gains = [t['gain'] for t in follow_sells]
-    mom_gains = [t['gain'] for t in mom_sells]
-
     all_sells = [t for t in transactions if t['action'] == 'SELL']
     all_gains = [t['gain'] for t in all_sells]
     overall_win = len([g for g in all_gains if g > 0]) / len(all_gains) if all_gains else 0
-
-    # 持續跟進 (REVERSAL 買後又有 FOLLOW 買)
-    continued = 0
-    rev_sids = set()
-    for t in transactions:
-        if t['action'] == 'BUY' and t.get('strategy') == 'REVERSAL':
-            rev_sids.add(t['stock_id'])
-        if t['action'] == 'BUY' and t.get('strategy') == 'FOLLOW' and t['stock_id'] in rev_sids:
-            continued += 1
-
-    if not silent:
-        print(f"\n=== 動能 + 隔日沖 整合回測結果 (第一版 loose) ===")
-        print(f"回測期間: {all_dates[start_idx]} ~ {all_dates[-1]} ({days}天)")
-        print(f"初始資金: {starting_cash:,.0f}  最終價值: {final_value:,.0f}")
-        print(f"總報酬率: {total_return:.2%}  年化: {annualized:.2%}")
-        print(f"交易次數: {len(transactions)}")
-
-        print(f"\n策略分析 (買入/賣出):")
-        mom_wr = (len([g for g in mom_gains if g>0])/len(mom_gains) if mom_gains else 0)
-        mom_avg = (sum(mom_gains)/len(mom_gains) if mom_gains else 0)
-        rev_wr = (len([g for g in rev_gains if g>0])/len(rev_gains) if rev_gains else 0)
-        rev_avg = (sum(rev_gains)/len(rev_gains) if rev_gains else 0)
-        fol_wr = (len([g for g in fol_gains if g>0])/len(fol_gains) if fol_gains else 0)
-        fol_avg = (sum(fol_gains)/len(fol_gains) if fol_gains else 0)
-        print(f"  MOMENTUM: 買 {len(mom_buys)} / 賣 {len(mom_sells)} | 賣出勝率 {mom_wr:.1%} 平均 {mom_avg:.2%}")
-        print(f"  REVERSAL: 買 {len(reversal_buys)} / 賣 {len(reversal_sells)} | 賣出勝率 {rev_wr:.1%} 平均 {rev_avg:.2%}")
-        print(f"  FOLLOW:   買 {len(follow_buys)} / 賣 {len(follow_sells)} | 賣出勝率 {fol_wr:.1%} 平均 {fol_avg:.2%}")
-
-        overall_avg = (sum(all_gains)/len(all_gains) if all_gains else 0)
-        print(f"\n總體: 買 {len([t for t in transactions if t['action']=='BUY'])} / 賣 {len(all_sells)} | 整體勝率 {overall_win:.1%} 賣出平均 {overall_avg:.2%}")
-        print(f"反彈後持續跟進次數: {continued}")
 
     result = {
         'total_return': total_return,
@@ -425,50 +564,42 @@ def run_momentum_day_trading_backtest(override_config: dict = None, silent: bool
         'final_value': final_value,
         'transactions': transactions,
         'days': days,
-        'momentum_performance': {
-            'buys': len(mom_buys), 'sells': len(mom_sells),
-            'win_rate': len([g for g in mom_gains if g > 0]) / len(mom_gains) if mom_gains else 0,
-            'avg_return': sum(mom_gains) / len(mom_gains) if mom_gains else 0
-        },
         'reversal_performance': {
-            'buys': len(reversal_buys), 'sells': len(reversal_sells),
             'win_rate': len([g for g in rev_gains if g > 0]) / len(rev_gains) if rev_gains else 0,
             'avg_return': sum(rev_gains) / len(rev_gains) if rev_gains else 0
         },
-        'follow_performance': {
-            'buys': len(follow_buys), 'sells': len(follow_sells),
-            'win_rate': len([g for g in fol_gains if g > 0]) / len(fol_gains) if fol_gains else 0,
-            'avg_return': sum(fol_gains) / len(fol_gains) if fol_gains else 0
-        },
         'overall': {
-            'total_buys': len([t for t in transactions if t['action'] == 'BUY']),
-            'total_sells': len(all_sells),
             'win_rate': overall_win,
-            'avg_gain_on_sells': sum(all_gains) / len(all_gains) if all_gains else 0,
-            'continued_follow_after_reversal': continued
+            'total_transactions': len(transactions)
         }
     }
 
-    # 自動存檔 (時間戳)
     try:
         os.makedirs(RESULT_DIR, exist_ok=True)
         ts = datetime.now().strftime("%y%m%d_%H%M")
         fpath = os.path.join(RESULT_DIR, f"momentum_day_trading_{ts}.json")
         with open(fpath, 'w', encoding='utf-8') as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
-        if not silent:
-            print(f"[SAVE] 結果已存檔: {fpath}")
-    except Exception as e:
-        if not silent:
-            print(f"[WARN] 存檔失敗: {e}")
+    except:
+        pass
 
     return result
 
 if __name__ == "__main__":
-    print("=== 動能 + 隔日沖 整合回測 (第一版) ===")
-    result = run_momentum_day_trading_backtest()
-    if result:
-        print(f"\n最終年化報酬率: {result['annualized_return']:.2%}")
-        print(f"總體勝率: {result['overall']['win_rate']:.1%}")
-        print("詳細結果已存檔至 v1/result (時間戳 json)")
-        print("請查看輸出與存檔，確認 base 是否能動，然後告訴我下一步調整方向。")
+    print("=== 動能 + 隔日沖 整合回測 (2330 & 6187 對照組測試) ===")
+    test_config = {'TARGET_SIDS': ['2330', '6187'], 'STARTING_CASH': 10000000, 'TOP_N': 5}
+    
+    print("\n>>> 測試 1: 原始邏輯 (不強制買賣指數正向)")
+    res_orig = run_momentum_day_trading_backtest(override_config={**test_config, 'USE_STRICT_REVERSAL': False}, silent=True)
+    
+    print("\n>>> 測試 2: 優化邏輯 (強制買賣指數正向)")
+    res_strict = run_momentum_day_trading_backtest(override_config={**test_config, 'USE_STRICT_REVERSAL': True}, silent=True)
+    
+    if res_orig and res_strict:
+        print("\n" + "="*50)
+        print(f"{'指標':<15} | {'原始邏輯':<10} | {'優化邏輯':<10}")
+        print("-" * 50)
+        print(f"{'總報酬率':<15} | {res_orig['total_return']:>10.2%} | {res_strict['total_return']:>10.2%}")
+        print(f"{'整體勝率':<15} | {res_orig['overall']['win_rate']:>10.1%} | {res_strict['overall']['win_rate']:>10.1%}")
+        print(f"{'REVERSAL勝率':<15} | {res_orig['reversal_performance']['win_rate']:>10.1%} | {res_strict['reversal_performance']['win_rate']:>10.1%}")
+        print("="*50)
