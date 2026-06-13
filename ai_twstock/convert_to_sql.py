@@ -14,7 +14,7 @@ def create_db(db_path):
     cursor.execute('PRAGMA synchronous=NORMAL;')
     cursor.execute('PRAGMA cache_size = -524288;') # 512MB Cache
     cursor.execute('PRAGMA temp_store = MEMORY;')  # 暫存檔放記憶體
-    cursor.execute('PRAGMA mmap_size = 30000000000;') # 允許使用 Memory-Mapped I/O (加速讀取)
+    cursor.execute('PRAGMA mmap_size = 30000000000;') # 允許使用 Memory-Mapped I/O
     
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS daily_prices (
@@ -62,7 +62,7 @@ def import_brokers_streaming(conn, json_path):
     if not os.path.exists(json_path): return
     cursor = conn.cursor()
     batch_data = []
-    batch_size = 50000 # 加大 Batch Size
+    batch_size = 50000
     total_count = 0
     stock_count = 0
     
@@ -94,17 +94,19 @@ def finalize_db(conn):
     print("\n--- 執行資料庫最終優化 ---")
     cursor = conn.cursor()
     
-    # 1. 建立「覆蓋索引」：包含常用欄位，讓查詢不用回表
-    print("正在建立覆蓋索引 (Covering Index)...")
+    # 1. 修正覆蓋索引：加入 trader_name，確保查詢「買超排行」時完全不需回表
+    print("正在建立強化版覆蓋索引 (Covering Index)...")
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_broker_lookup ON broker_details (stock_id, date)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_broker_fast_query ON broker_details (stock_id, date, is_buy, net_qty, avg_price)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_broker_fast_query ON broker_details (stock_id, date, is_buy, net_qty, trader_name, avg_price)')
     
     # 2. 更新統計資訊
     print("正在更新統計資訊 (ANALYZE)...")
     cursor.execute('ANALYZE')
     
-    # 3. 磁碟空間重整與壓縮
-    print("正在重整磁碟空間 (VACUUM)... 這可能需要一點時間")
+    # 3. 磁碟空間重整與資料叢集化 (Clustering)
+    # VACUUM 會按照主鍵 (stock_id, date) 的順序重新物理排列資料
+    # 這會讓同一檔股票的資料在硬碟上連續分佈，極大提升 Sequential Read 速度
+    print("正在執行資料叢集化與壓縮 (VACUUM)... 這對 1800 萬筆資料非常重要")
     cursor.execute('VACUUM')
     
     conn.commit()
