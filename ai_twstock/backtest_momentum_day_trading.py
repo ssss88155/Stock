@@ -179,16 +179,17 @@ def calculate_day_trading_signal(sid: str, date: str, data: dict, micro_features
 
     # 判斷邏輯優化：
     # REVERSAL: 隔日沖賣出 (net_score > 0) 且 買賣指數為正 (代表買方比賣方更「穩重」)
-    if net_score > 0 and bs_diff_index > 0.2:
+    # 修正：增加對 net_score 絕對值的要求，確保有足夠的券商行為發生
+    if net_score > 20 and bs_diff_index > 0.1:
         result = {
             'type': 'REVERSAL',
-            'strength': min(100, bs_diff_index * 50),
+            'strength': min(100, bs_diff_index * 80),
             'reason': f'REVERSAL: 買賣指數正向({bs_diff_index:.2f})'
         }
-    elif net_score < 0 and bs_diff_index < -0.2:
+    elif net_score < -20 and bs_diff_index < -0.1:
         result = {
             'type': 'FOLLOW',
-            'strength': min(100, abs(bs_diff_index) * 50),
+            'strength': min(100, abs(bs_diff_index) * 60),
             'reason': f'FOLLOW: 買賣指數負向({bs_diff_index:.2f})'
         }
     else:
@@ -215,41 +216,55 @@ def calculate_broker_concentration(sid: str, date: str, data: dict) -> float:
     top_5_buy_sum = sum([abs(t.get('net', 0)) for t in top_buyers[:5] if t.get('net', 0) > 0])
     return top_5_buy_sum / total_vol
 
-def check_abnormal_broker_buy(sid: str, date: str, data: dict) -> bool:
+def check_price_volume_alignment(sid: str, date: str, data: dict) -> dict:
     """
-    量價配合: 檢查今日買超第一名分點是否為異常買超 (> 20日平均 3 倍)
+    深度量價配合分析：
+    1. 買超集中度 (Top 5 Buy / Total Volume)
+    2. 買一異常度 (Current Top Buy / Avg Top Buy)
+    3. 漲幅匹配度 (漲幅是否由主力買盤支撐)
     """
     stock_info = data.get(sid, {})
     report = stock_info.get('trading_daily_report', {}).get(date, {})
+    price_info = stock_info.get('price', {}).get(date, {})
     top_buyers = report.get('top_buyers', [])
     
-    if not top_buyers:
-        return False
+    if not top_buyers or not price_info:
+        return {'concentration': 0, 'is_aligned': False, 'top_buy_ratio': 0}
         
-    current_top_buy = abs(top_buyers[0].get('net', 0))
-    if current_top_buy <= 0:
-        return False
-        
-    # 計算過去 20 天的平均買超第一名量
-    all_dates = sorted(list(stock_info.get('trading_daily_report', {}).keys()))
-    if date not in all_dates:
-        return False
-        
-    idx = all_dates.index(date)
-    lookback_dates = all_dates[max(0, idx-20):idx]
+    total_vol = price_info.get('Trading_Volume', 0)
+    if total_vol <= 0: return {'concentration': 0, 'is_aligned': False, 'top_buy_ratio': 0}
+
+    top_5_buy_sum = sum([abs(t.get('net', 0)) for t in top_buyers[:5] if t.get('net', 0) > 0])
+    concentration = top_5_buy_sum / total_vol
     
-    past_buys = []
-    for d in lookback_dates:
-        d_report = stock_info['trading_daily_report'].get(d, {})
-        d_buyers = d_report.get('top_buyers', [])
-        if d_buyers:
-            past_buys.append(abs(d_buyers[0].get('net', 0)))
-            
-    if not past_buys:
-        return False
-        
-    avg_past_buy = sum(past_buys) / len(past_buys)
-    return current_top_buy > (avg_past_buy * 3)
+    # 漲幅計算
+    close = price_info.get('close', 0)
+    open_p = price_info.get('open', 0)
+    gain = (close - open_p) / open_p if open_p > 0 else 0
+    
+    # 買一異常度
+    current_top_buy = abs(top_buyers[0].get('net', 0))
+    all_dates = sorted(list(stock_info.get('trading_daily_report', {}).keys()))
+    idx = all_dates.index(date) if date in all_dates else -1
+    
+    avg_past_buy = 0
+    if idx > 0:
+        lookback = all_dates[max(0, idx-20):idx]
+        past_buys = [abs(stock_info['trading_daily_report'][d]['top_buyers'][0]['net'])
+                     for d in lookback if stock_info['trading_daily_report'].get(d, {}).get('top_buyers')]
+        avg_past_buy = sum(past_buys) / len(past_buys) if past_buys else 0
+
+    # 邏輯：如果漲幅很大 (>4%) 但集中度很低 (<5%)，代表是散戶盤，不穩
+    # 如果集中度很高 (>15%) 但股價沒漲甚至跌，代表有人在倒貨給主力，危險
+    is_aligned = True
+    if gain > 0.04 and concentration < 0.05: is_aligned = False
+    if concentration > 0.15 and gain < -0.01: is_aligned = False
+    
+    return {
+        'concentration': concentration,
+        'is_aligned': is_aligned,
+        'top_buy_ratio': current_top_buy / avg_past_buy if avg_past_buy > 0 else 1.0
+    }
 
 def calculate_day_trader_risk(sid: str, date: str, data: dict, micro_features: dict) -> float:
     """
@@ -270,30 +285,43 @@ def calculate_day_trader_risk(sid: str, date: str, data: dict, micro_features: d
             day_trader_buy_vol += net_qty
     return day_trader_buy_vol / total_top_buy_vol if total_top_buy_vol > 0 else 0
 
-def decide_buy(momentum_score: float, dt_signal: dict, risk_ratio: float = 0, is_winner_buying: bool = False, mom_threshold: float = LOOSE_BUY_SCORE_THRESHOLD, use_strict_reversal: bool = True) -> tuple:
+def decide_buy(momentum_score: float, dt_signal: dict, risk_ratio: float = 0, is_winner_buying: bool = False,
+               pv_alignment: dict = None, mom_threshold: float = LOOSE_BUY_SCORE_THRESHOLD,
+               use_strict_reversal: bool = True) -> tuple:
     """
-    修正後的買進決策：放寬過濾器，恢復靈敏度
+    深度優化決策：結合券商行為與量價結構
     """
-    # 1. 隔日沖風險過濾 (放寬至 50%，避免誤殺強勢換手)
+    # 1. 隔日沖風險過濾 (維持 50%)
     if risk_ratio > 0.50:
         return False, None, f'隔日沖風險過高({risk_ratio:.1%})'
 
-    # 2. 贏家加持：若贏家在買，放寬動能門檻 20%
-    effective_threshold = mom_threshold * 0.8 if is_winner_buying else mom_threshold
+    # 2. 量價背離過濾 (核心優化)
+    if pv_alignment and not pv_alignment['is_aligned']:
+        return False, None, f'量價背離(集中度:{pv_alignment["concentration"]:.1%})'
 
-    # 3. 策略優先級調整 (恢復原始靈敏度)
+    # 3. 贏家與集中度加持
+    # 如果集中度高 (>8%) 且贏家在買，大幅放寬門檻 (震盪盤更看重集中度)
+    effective_threshold = mom_threshold
+    if is_winner_buying:
+        effective_threshold *= 0.75 # 贏家同步加權提高
+    if pv_alignment and pv_alignment['concentration'] > 0.08:
+        effective_threshold *= 0.85 # 集中度門檻降低，但加權提高
+
+    # 4. 策略判斷
     if dt_signal['type'] == 'REVERSAL':
         if use_strict_reversal and '買賣指數正向' not in dt_signal['reason']:
             return False, None, ''
-        if dt_signal['strength'] >= 25: # 調回 25
+        # 如果是反轉策略，集中度必須 > 5% 才具備可信度
+        if dt_signal['strength'] >= 25 and (pv_alignment['concentration'] > 0.05 if pv_alignment else True):
             return True, 'REVERSAL', dt_signal['reason']
             
-    if dt_signal['type'] == 'FOLLOW' and dt_signal['strength'] >= 20: # 調回 20
+    if dt_signal['type'] == 'FOLLOW' and dt_signal['strength'] >= 20:
         return True, 'FOLLOW', dt_signal['reason']
         
     if momentum_score >= effective_threshold:
         reason = f'動能分數 {momentum_score:.1f}'
         if is_winner_buying: reason += " (贏家同步)"
+        if pv_alignment and pv_alignment['concentration'] > 0.1: reason += f" (集中度:{pv_alignment['concentration']:.1%})"
         return True, 'MOMENTUM', reason
         
     return False, None, ''
@@ -470,6 +498,7 @@ def run_momentum_day_trading_backtest(override_config: dict = None, silent: bool
                 mom_score = r['score']
                 dt_sig = calculate_day_trading_signal(sid, analysis_date, data, micro_features)
                 risk_ratio = calculate_day_trader_risk(sid, analysis_date, data, micro_features)
+                pv_alignment = check_price_volume_alignment(sid, analysis_date, data)
                 
                 # 修正贏家邏輯：只要買一或買二分點是「穩重分點」即視為贏家同步
                 is_winner_buying = False
@@ -481,7 +510,9 @@ def run_momentum_day_trading_backtest(override_config: dict = None, silent: bool
                         is_winner_buying = True
                         break
 
-                buy, strat, reason = decide_buy(mom_score, dt_sig, risk_ratio=risk_ratio, is_winner_buying=is_winner_buying, mom_threshold=buy_score_threshold, use_strict_reversal=use_strict_reversal)
+                buy, strat, reason = decide_buy(mom_score, dt_sig, risk_ratio=risk_ratio, is_winner_buying=is_winner_buying,
+                                               pv_alignment=pv_alignment, mom_threshold=buy_score_threshold,
+                                               use_strict_reversal=use_strict_reversal)
                 if buy:
                     candidates.append({
                         'sid': sid,
