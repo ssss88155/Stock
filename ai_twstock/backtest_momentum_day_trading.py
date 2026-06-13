@@ -262,12 +262,31 @@ def run_backtest():
 
         if len(portfolio) < top_n:
             analysis_date = all_dates[idx-1]
+            
+            # 1. 找出當日熱門產業 (Top 3) - 讓市場決定
+            sector_scores = defaultdict(list)
+            for sid, details in data.items():
+                if analysis_date not in details['price']: continue
+                p_data = details['price']; sorted_d = sorted(p_data.keys()); a_idx = sorted_d.index(analysis_date)
+                if a_idx < 20: continue
+                start_p = p_data[sorted_d[a_idx-20]]['close']
+                if start_p <= 0: continue
+                gain_20 = (p_data[analysis_date]['close'] - start_p) / start_p
+                ind = stock_industries.get(sid, "其他")
+                if ind == "其他": continue
+                sector_scores[ind].append(gain_20)
+            
+            # 計算產業平均漲幅並取 Top 3 (要求產業至少有 5 檔股票具備代表性)
+            avg_sector_gain = {ind: sum(gains)/len(gains) for ind, gains in sector_scores.items() if len(gains) >= 5}
+            top_sectors = sorted(avg_sector_gain.items(), key=lambda x: x[1], reverse=True)[:3]
+            top_sector_names = [x[0] for x in top_sectors]
+            
             candidates = []
             for sid, details in data.items():
                 if sid in portfolio or analysis_date not in details['price'] or current_date not in details['price']: continue
                 
                 industry = stock_industries.get(sid, "")
-                if "半導體" not in industry: continue
+                if industry not in top_sector_names: continue
                 
                 p_data = details['price']; sorted_d = sorted(p_data.keys()); a_idx = sorted_d.index(analysis_date)
                 if a_idx < 20: continue
