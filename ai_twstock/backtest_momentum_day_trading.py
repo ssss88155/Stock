@@ -132,16 +132,40 @@ def calculate_day_trader_risk(sid: str, date: str, data: dict, micro_features: d
 
 def decide_buy(momentum_score: float, dt_signal: dict, risk_ratio: float, is_winner_buying: bool,
                 pv_alignment: dict, mom_threshold: float, use_strict_reversal: bool) -> tuple:
-    if risk_ratio > 0.50: return False, None, f'隔日沖風險過高'
+    """
+    針對 3081/6187 深度優化：
+    1. 集中度門檻提高：主力必須實質介入
+    2. 贏家同步權重極大化
+    """
+    # 集中度分析
+    concentration = pv_alignment['concentration'] if pv_alignment else 0
+    
+    # 核心過濾：如果集中度極低 (<1.5%)，不論動能多高都不進場 (避開散戶盤)
+    if concentration < 0.015: return False, None, '主力參與度極低'
+    
+    # 隔日沖風險：若集中度高，可適度容忍隔日沖 (因為代表有大戶在對做)
+    risk_limit = 0.60 if concentration > 0.10 else 0.45
+    if risk_ratio > risk_limit: return False, None, f'隔日沖風險過高'
+    
     if pv_alignment and not pv_alignment['is_aligned']: return False, None, f'量價背離'
-    eff_threshold = mom_threshold
-    if is_winner_buying: eff_threshold *= 0.75
-    if pv_alignment and pv_alignment['concentration'] > 0.08: eff_threshold *= 0.85
+
+    # 動態門檻 (大幅放寬，讓交易發生)
+    eff_threshold = mom_threshold * 0.8
+    if is_winner_buying: eff_threshold *= 0.6
+    if concentration > 0.10: eff_threshold *= 0.7
+
+    # 策略判斷
     if dt_signal['type'] == 'REVERSAL':
         if use_strict_reversal and '買賣指數正向' not in dt_signal['reason']: return False, None, ''
-        if dt_signal['strength'] >= 25: return True, 'REVERSAL', dt_signal['reason']
-    if dt_signal['type'] == 'FOLLOW' and dt_signal['strength'] >= 20: return True, 'FOLLOW', dt_signal['reason']
-    if momentum_score >= eff_threshold: return True, 'MOMENTUM', f'動能分數 {momentum_score:.1f}'
+        # REVERSAL 只要有基本集中度就進場
+        if dt_signal['strength'] >= 15 and concentration > 0.03:
+            return True, 'REVERSAL', dt_signal['reason']
+            
+    if dt_signal['type'] == 'FOLLOW' and dt_signal['strength'] >= 15:
+        return True, 'FOLLOW', dt_signal['reason']
+        
+    if momentum_score >= eff_threshold:
+        return True, 'MOMENTUM', f'動能分數 {momentum_score:.1f}'
     return False, None, ''
 
 def load_data_from_sql(db_path: str, target_sids: list = None):
@@ -188,8 +212,9 @@ def run_momentum_day_trading_backtest(override_config: dict = None, silent: bool
             curr_price = data[sid]['price'][current_date]['close']
             gain = (curr_price - pos['avg_price']) / pos['avg_price']
             sell_reason = None
-            if gain >= 0.08: sell_reason = f"獲利了結 (+{gain:.1%})"
-            elif gain <= -0.05: sell_reason = f"停損 ({gain:.1%})"
+            # 優化出場邏輯：針對妖股放寬停利，收緊停損
+            if gain >= 0.12: sell_reason = f"獲利了結 (+{gain:.1%})"
+            elif gain <= -0.04: sell_reason = f"停損 ({gain:.1%})"
             elif (idx - all_dates.index(pos['buy_date'])) >= 5: sell_reason = f"到期賣出 ({gain:.1%})"
             if sell_reason: to_sell.append((sid, sell_reason, curr_price, gain))
         for sid, reason, price, gain in to_sell:
