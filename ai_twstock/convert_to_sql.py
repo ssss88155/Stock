@@ -3,6 +3,7 @@ import sqlite3
 import os
 import ijson
 import time
+import sys
 
 def create_db(db_path):
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
@@ -38,23 +39,46 @@ def create_db(db_path):
     return conn
 
 def import_prices(conn, json_path):
-    print(f"正在匯入價格資料: {json_path}")
+    """優化：改用 ijson 串流讀取價格資料，並強制轉換 Decimal 為 float/int"""
+    print(f"正在匯入價格資料 (串流): {json_path}")
     if not os.path.exists(json_path): return
-    with open(json_path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
+    
     cursor = conn.cursor()
     batch_data = []
-    for sid, info in data.items():
-        prices = info.get('price', {})
-        inst = info.get('institutional', {})
-        for date, p in prices.items():
-            i = inst.get(date, {})
-            f_buy = i.get('Foreign_Investor', {}).get('buy', 0) - i.get('Foreign_Investor', {}).get('sell', 0)
-            s_buy = i.get('Investment_Trust', {}).get('buy', 0) - i.get('Investment_Trust', {}).get('sell', 0)
-            d_buy = i.get('Dealer', {}).get('buy', 0) - i.get('Dealer', {}).get('sell', 0)
-            batch_data.append((sid, date, p.get('open'), p.get('max'), p.get('min'), p.get('close'), p.get('Trading_Volume'), f_buy, s_buy, d_buy))
-    if batch_data:
-        cursor.executemany('INSERT OR REPLACE INTO daily_prices VALUES (?,?,?,?,?,?,?,?,?,?)', batch_data)
+    batch_size = 10000
+    
+    with open(json_path, 'r', encoding='utf-8') as f:
+        parser = ijson.kvitems(f, '')
+        for sid, info in parser:
+            prices = info.get('price', {})
+            inst = info.get('institutional', {})
+            for date, p in prices.items():
+                i = inst.get(date, {})
+                f_inv = i.get('Foreign_Investor', {})
+                s_inv = i.get('Investment_Trust', {})
+                d_inv = i.get('Dealer', {})
+                
+                # 強制轉換 Decimal 為 float/int 以相容 SQLite
+                f_net = float(f_inv.get('buy', 0)) - float(f_inv.get('sell', 0))
+                s_net = float(s_inv.get('buy', 0)) - float(s_inv.get('sell', 0))
+                d_net = float(d_inv.get('buy', 0)) - float(d_inv.get('sell', 0))
+                
+                batch_data.append((
+                    sid, date, 
+                    float(p.get('open', 0)) if p.get('open') is not None else None,
+                    float(p.get('max', 0)) if p.get('max') is not None else None,
+                    float(p.get('min', 0)) if p.get('min') is not None else None,
+                    float(p.get('close', 0)) if p.get('close') is not None else None,
+                    int(float(p.get('Trading_Volume', 0))),
+                    int(f_net), int(s_net), int(d_net)
+                ))
+                
+                if len(batch_data) >= batch_size:
+                    cursor.executemany('INSERT OR REPLACE INTO daily_prices VALUES (?,?,?,?,?,?,?,?,?,?)', batch_data)
+                    batch_data = []
+        
+        if batch_data:
+            cursor.executemany('INSERT OR REPLACE INTO daily_prices VALUES (?,?,?,?,?,?,?,?,?,?)', batch_data)
     conn.commit()
 
 def import_brokers_streaming(conn, json_path):
@@ -76,10 +100,16 @@ def import_brokers_streaming(conn, json_path):
                     for t in report.get(key, []):
                         trader_str = str(t.get('trader', ''))
                         if not trader_str: continue
-                        t_name, t_id = trader_str.split('/') if '/' in trader_str else (trader_str, '')
-                        qty = int(abs(float(t.get('net_b', t.get('net_s', t.get('net', 0))))))
-                        batch_data.append((sid, date, t_name, t_id, qty, float(t.get('avg_p', 0)), is_buy))
+                        
+                        parts = trader_str.split('/', 1)
+                        t_name, t_id = parts if len(parts) == 2 else (parts[0], '')
+                        
+                        qty_raw = t.get('net_b', t.get('net_s', t.get('net', 0)))
+                        qty = int(abs(float(qty_raw)))
+                        avg_p = float(t.get('avg_p', 0))
+                        batch_data.append((sid, date, t_name, t_id, qty, avg_p, is_buy))
                         total_count += 1
+                        
                         if len(batch_data) >= batch_size:
                             cursor.executemany('INSERT OR REPLACE INTO broker_details VALUES (?,?,?,?,?,?,?)', batch_data)
                             conn.commit()
@@ -94,22 +124,24 @@ def finalize_db(conn):
     print("\n--- 執行資料庫最終優化 ---")
     cursor = conn.cursor()
     
-    # 1. 修正覆蓋索引：加入 trader_name，確保查詢「買超排行」時完全不需回表
-    print("正在建立強化版覆蓋索引 (Covering Index)...")
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_broker_lookup ON broker_details (stock_id, date)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_broker_fast_query ON broker_details (stock_id, date, is_buy, net_qty, trader_name, avg_price)')
+    print("正在建立索引 (idx_broker_lookup)...")
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_broker_lookup ON broker_details (stock_id, date, is_buy, net_qty, trader_name, avg_price)')
     
-    # 2. 更新統計資訊
+    print("正在建立索引 (idx_broker_query)...")
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_broker_query ON broker_details (stock_id, date, is_buy, net_qty DESC)')
+    
     print("正在更新統計資訊 (ANALYZE)...")
     cursor.execute('ANALYZE')
     
-    # 3. 磁碟空間重整與資料叢集化 (Clustering)
-    # VACUUM 會按照主鍵 (stock_id, date) 的順序重新物理排列資料
-    # 這會讓同一檔股票的資料在硬碟上連續分佈，極大提升 Sequential Read 速度
-    print("正在執行資料叢集化與壓縮 (VACUUM)... 這對 1800 萬筆資料非常重要")
-    cursor.execute('VACUUM')
-    
     conn.commit()
+    
+    print("正在執行資料叢集化與壓縮 (VACUUM)...")
+    old_isolation = conn.isolation_level
+    conn.isolation_level = None 
+    conn.execute('VACUUM')
+    conn.isolation_level = old_isolation
+    
+    print("優化完成。")
 
 if __name__ == "__main__":
     DB_PATH = r"C:\jupyter_notebook\ai_twstock\data\SQL_DB\taiwan_stock_micro.db"
@@ -117,11 +149,19 @@ if __name__ == "__main__":
     BROKER_JSON = r"C:\jupyter_notebook\ai_twstock\stock_data_micro.json"
     
     start_time = time.time()
-    conn = create_db(DB_PATH)
-    import_prices(conn, PRICE_JSON)
-    import_brokers_streaming(conn, BROKER_JSON)
-    finalize_db(conn)
-    conn.close()
+    conn = None
+    try:
+        print(f"開始執行轉換流程...")
+        conn = create_db(DB_PATH)
+        import_prices(conn, PRICE_JSON)
+        import_brokers_streaming(conn, BROKER_JSON)
+        finalize_db(conn)
+        print(f"\n轉換完成！總耗時: {time.time() - start_time:.2f} 秒")
+    except Exception as e:
+        if conn: conn.rollback()
+        print(f"\n發生致命錯誤: {e}")
+        sys.exit(1)
+    finally:
+        if conn: conn.close()
     
-    print(f"所有資料轉換完成！總耗時: {time.time() - start_time:.2f} 秒")
     print(f"資料庫位於: {DB_PATH}")
