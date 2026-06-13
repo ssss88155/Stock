@@ -208,7 +208,7 @@ def run_backtest():
     all_dates = sorted(list(set(d for sid in data for d in data[sid].get('price', {}))))
     start_idx = all_dates.index(next(d for d in all_dates if d >= start_date))
     
-    cash = 2000000; portfolio = {}; transactions = []; top_n = 10
+    cash = 2000000; portfolio = {}; transactions = []; top_n = 8 # 恢復適度分散
     
     print(f"開始回測: {all_dates[start_idx]} -> {all_dates[-1]}")
     for idx in range(start_idx, len(all_dates)):
@@ -223,15 +223,25 @@ def run_backtest():
             mode = pos['mode']; params = STRATEGY_MODES[mode]
             sell_reason = None; sell_ratio = 1.0
             
-            if mode == 'VOLATILITY' and not pos.get('half_sold') and gain >= 0.10:
-                sell_reason = "分批減碼(+10%)"; sell_ratio = 0.5; pos['half_sold'] = True
+            if mode == 'VOLATILITY' and not pos.get('half_sold') and gain >= 0.15:
+                sell_reason = "分批減碼(+15%)"; sell_ratio = 0.5; pos['half_sold'] = True
             
             if not sell_reason:
-                if gain < (pos['max_gain'] - 0.08): sell_reason = "移動停損"
-                elif gain <= -0.10: sell_reason = "停損"
+                # 精準出場：SCALPING 模式隔天開高就跑，VOLATILITY 模式嚴守移動停損
+                if mode == 'SCALPING':
+                    if gain > 0.03: sell_reason = "隔日沖獲利"
+                    elif gain < -0.02: sell_reason = "隔日沖停損"
+                else:
+                    if gain < (pos['max_gain'] - 0.07): sell_reason = "移動停損"
+                    elif gain <= -0.05: sell_reason = "停損"
             
-            max_days = 1 if mode == 'SCALPING' else (30 if pos.get('half_sold') else 10)
-            if not sell_reason and (idx - all_dates.index(pos['buy_date'])) >= max_days: sell_reason = "到期"
+            # 汰弱留強：3天不漲就換股
+            max_days = 1 if mode == 'SCALPING' else (30 if pos.get('half_sold') else 3)
+            if not sell_reason and (idx - all_dates.index(pos['buy_date'])) >= max_days:
+                if mode == 'VOLATILITY' and gain < 0.02:
+                    sell_reason = "汰弱留強(不漲就換)"
+                else:
+                    sell_reason = "到期"
             
             if sell_reason:
                 qty = int(pos['shares'] * sell_ratio)
