@@ -40,6 +40,25 @@ LOOSE_BUY_SCORE_THRESHOLD = 50
 LOOSE_TOP_N = 15
 LOOSE_START_DAYS_BACK = 60
 
+# 雙模式設定
+STRATEGY_MODES = {
+    'VOLATILITY': {
+        'RISK_LIMIT': 0.45,
+        'MIN_CONCENTRATION': 0.01,
+        'STOP_LOSS': -0.06,
+        'TAKE_PROFIT': 0.12,
+        'BREAK_EVEN_TRIGGER': 0.05
+    },
+    'SCALPING': {
+        'RISK_LIMIT': 1.0, # 隔日沖模式不限風險，反而要跟隨
+        'MIN_CONCENTRATION': 0.05,
+        'STOP_LOSS': -0.02,
+        'TAKE_PROFIT': 0.04,
+        'BREAK_EVEN_TRIGGER': 0.02,
+        'MIN_RISK_RATIO': 0.40 # 至少要有 40% 隔日沖才叫 SCALPING
+    }
+}
+
 def load_config() -> dict:
     if os.path.exists(CONFIG_FILE):
         try:
@@ -131,36 +150,44 @@ def calculate_day_trader_risk(sid: str, date: str, data: dict, micro_features: d
     return dt_vol / total_vol if total_vol > 0 else 0
 
 def decide_buy(momentum_score: float, dt_signal: dict, risk_ratio: float, is_winner_buying: bool,
-                pv_alignment: dict, mom_threshold: float, use_strict_reversal: bool) -> tuple:
+                pv_alignment: dict, mom_threshold: float, use_strict_reversal: bool, mode: str = 'VOLATILITY') -> tuple:
     """
-    期望值優化版本：
-    1. 放寬集中度過濾，恢復勝率
-    2. 強化贏家同步的爆發力判斷
+    雙模式決策邏輯
     """
+    params = STRATEGY_MODES.get(mode, STRATEGY_MODES['VOLATILITY'])
     concentration = pv_alignment['concentration'] if pv_alignment else 0
     
-    # 1. 基礎過濾 (放寬至 1%，避免誤殺)
-    if concentration < 0.01: return False, None, '主力參與度極低'
-    if risk_ratio > 0.55: return False, None, f'隔日沖風險過高'
+    # 1. 模式特定過濾
+    if mode == 'VOLATILITY':
+        if risk_ratio > params['RISK_LIMIT']: return False, None, '隔日沖風險過高'
+        if concentration < params['MIN_CONCENTRATION']: return False, None, '主力參與度不足'
+    elif mode == 'SCALPING':
+        # SCALPING 模式：必須有隔日沖天團進場
+        if risk_ratio < params.get('MIN_RISK_RATIO', 0.4): return False, None, '無隔日沖天團跡象'
+        if concentration < params['MIN_CONCENTRATION']: return False, None, '集中度不足'
+
     if pv_alignment and not pv_alignment['is_aligned']: return False, None, f'量價背離'
 
-    # 2. 動態門檻 (恢復靈敏度)
+    # 2. 動態門檻
     eff_threshold = mom_threshold
-    if is_winner_buying: eff_threshold *= 0.7
-    if concentration > 0.08: eff_threshold *= 0.85
+    if mode == 'VOLATILITY':
+        if is_winner_buying: eff_threshold *= 0.7
+        if concentration > 0.10: eff_threshold *= 0.8
+    else: # SCALPING 模式更看重當日爆發力
+        if momentum_score > 120: eff_threshold *= 0.9
 
     # 3. 策略判斷
-    if dt_signal['type'] == 'REVERSAL':
+    if dt_signal['type'] == 'REVERSAL' and mode == 'VOLATILITY':
         if use_strict_reversal and '買賣指數正向' not in dt_signal['reason']: return False, None, ''
-        # 反轉訊號只要強度夠且有基本買盤就進場
-        if dt_signal['strength'] >= 20:
-            return True, 'REVERSAL', dt_signal['reason']
+        if dt_signal['strength'] >= 20: return True, 'REVERSAL', dt_signal['reason']
             
-    if dt_signal['type'] == 'FOLLOW' and dt_signal['strength'] >= 20:
-        return True, 'FOLLOW', dt_signal['reason']
+    if dt_signal['type'] == 'FOLLOW':
+        # FOLLOW 策略在 SCALPING 模式下非常有價值
+        min_strength = 15 if mode == 'SCALPING' else 25
+        if dt_signal['strength'] >= min_strength: return True, 'FOLLOW', dt_signal['reason']
         
     if momentum_score >= eff_threshold:
-        return True, 'MOMENTUM', f'動能分數 {momentum_score:.1f}'
+        return True, 'MOMENTUM', f'動能分數 {momentum_score:.1f} ({mode})'
     return False, None, ''
 
 def load_data_from_sql(db_path: str, target_sids: list = None):
@@ -207,18 +234,28 @@ def run_momentum_day_trading_backtest(override_config: dict = None, silent: bool
             curr_price = data[sid]['price'][current_date]['close']
             gain = (curr_price - pos['avg_price']) / pos['avg_price']
             
+            # 根據買入時的模式套用不同參數
+            mode = pos.get('mode', 'VOLATILITY')
+            params = STRATEGY_MODES.get(mode, STRATEGY_MODES['VOLATILITY'])
+            
             # 更新最高獲利紀錄
             if 'max_gain' not in pos or gain > pos['max_gain']:
                 pos['max_gain'] = gain
                 
             sell_reason = None
-            # 出場邏輯修正：放寬停損至 6%，停利設為 10% 並加入保本概念
-            if gain >= 0.10: sell_reason = f"獲利了結 (+{gain:.1%})"
-            elif gain <= -0.06: sell_reason = f"停損 ({gain:.1%})"
-            # 保本機制 (獲利曾達 5% 但回落至 2% 以下)
-            elif pos.get('max_gain', 0) > 0.05 and gain < 0.02:
-                sell_reason = f"保本出場 ({gain:.1%})"
-            elif (idx - all_dates.index(pos['buy_date'])) >= 5: sell_reason = f"到期賣出 ({gain:.1%})"
+            # 模式化出場邏輯
+            if gain >= params['TAKE_PROFIT']:
+                sell_reason = f"獲利了結({mode}) (+{gain:.1%})"
+            elif gain <= params['STOP_LOSS']:
+                sell_reason = f"停損({mode}) ({gain:.1%})"
+            # 保本機制
+            elif pos.get('max_gain', 0) > params['BREAK_EVEN_TRIGGER'] and gain < (params['BREAK_EVEN_TRIGGER'] * 0.4):
+                sell_reason = f"保本出場({mode}) ({gain:.1%})"
+            
+            # 持有天數限制：SCALPING 模式只留 1 天，VOLATILITY 留 5 天
+            max_days = 1 if mode == 'SCALPING' else 5
+            if (idx - all_dates.index(pos['buy_date'])) >= max_days:
+                sell_reason = f"到期賣出({mode}) ({gain:.1%})"
             
             if sell_reason: to_sell.append((sid, sell_reason, curr_price, gain))
         for sid, reason, price, gain in to_sell:
@@ -240,7 +277,13 @@ def run_momentum_day_trading_backtest(override_config: dict = None, silent: bool
                 for tb in top_buyers[:2]:
                     bid = str(tb.get('trader', '')).split('/')[-1].strip()
                     if bid in micro_features and micro_features[bid].get('穩重指數', 0) > 15: is_winner_buying = True; break
-                buy, strat, reason = decide_buy(r['score'], dt_sig, risk_ratio, is_winner_buying, pv_alignment, _config.get('BUY_SCORE_THRESHOLD', LOOSE_BUY_SCORE_THRESHOLD), use_strict_reversal)
+                
+                # 自動判定模式：隔日沖佔比高則進入 SCALPING
+                current_mode = 'SCALPING' if risk_ratio > 0.35 else 'VOLATILITY'
+                
+                buy, strat, reason = decide_buy(r['score'], dt_sig, risk_ratio, is_winner_buying, pv_alignment,
+                                               _config.get('BUY_SCORE_THRESHOLD', LOOSE_BUY_SCORE_THRESHOLD),
+                                               use_strict_reversal, mode=current_mode)
                 if buy:
                     buy_budget = cash / max(1, (_config.get('TOP_N', LOOSE_TOP_N) - len(portfolio)))
                     shares = int((buy_budget * 0.8) / price / 1000) * 1000
@@ -248,8 +291,14 @@ def run_momentum_day_trading_backtest(override_config: dict = None, silent: bool
                         cost = shares * price * 1.002
                         if cash >= cost:
                             cash -= cost
-                            portfolio[sid] = {'shares': shares, 'avg_price': price, 'buy_date': current_date, 'strategy': strat}
-                            transactions.append({'date': current_date, 'action': 'BUY', 'stock_id': sid, 'strategy': strat})
+                            portfolio[sid] = {
+                                'shares': shares, 'avg_price': price, 'buy_date': current_date,
+                                'strategy': strat, 'mode': current_mode
+                            }
+                            transactions.append({
+                                'date': current_date, 'action': 'BUY', 'stock_id': sid,
+                                'strategy': strat, 'mode': current_mode, 'reason': reason
+                            })
     final_value = cash + sum(pos['shares'] * data[sid]['price'][all_dates[-1]]['close'] for sid, pos in portfolio.items() if all_dates[-1] in data.get(sid, {}).get('price', {}))
     
     # 完整統計
