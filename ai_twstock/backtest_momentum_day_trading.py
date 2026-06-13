@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 backtest_momentum_day_trading.py
-全市場動能 + 券商分點雙模式回測系統 (獨立運行版)
+牛市衝鋒版：放寬進場、極速停損、利潤奔跑
 目標：超越 0050 漲幅 (25%+)
 """
 
@@ -12,7 +12,7 @@ import sys
 import sqlite3
 import pandas as pd
 from datetime import datetime
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 
 # 嘗試設定輸出編碼
 try:
@@ -23,7 +23,7 @@ except Exception:
     pass
 
 # =================================================================
-# 策略參數與權重 (整合自 analyze_momentum.py)
+# 策略參數與權重
 # =================================================================
 DEFAULT_WEIGHTS = {
     'WEIGHT_GAIN': 40, 'WEIGHT_VOLUME': 10, 'WEIGHT_FOREIGN': 10,
@@ -34,27 +34,28 @@ DEFAULT_WEIGHTS = {
 # 雙模式設定
 STRATEGY_MODES = {
     'VOLATILITY': {
-        'RISK_LIMIT': 0.45,
+        'RISK_LIMIT': 0.60,
         'MIN_CONCENTRATION': 0.01,
-        'STOP_LOSS': -0.06,
-        'TAKE_PROFIT': 0.12,
+        'STOP_LOSS': -0.08,
+        'TAKE_PROFIT': 9.99, # 取消固定停利
         'BREAK_EVEN_TRIGGER': 0.05
     },
     'SCALPING': {
         'RISK_LIMIT': 1.0,
         'MIN_CONCENTRATION': 0.05,
-        'STOP_LOSS': -0.02,
-        'TAKE_PROFIT': 0.04,
-        'BREAK_EVEN_TRIGGER': 0.02,
+        'STOP_LOSS': -0.03,
+        'TAKE_PROFIT': 0.06,
+        'BREAK_EVEN_TRIGGER': 0.03,
         'MIN_RISK_RATIO': 0.40
     }
 }
 
 MICRO_FEATURE_FILE = r"C:\jupyter_notebook\ai_twstock\data\micro_feature_all.json"
 DB_PATH = r"C:\jupyter_notebook\ai_twstock\data\SQL_DB\taiwan_stock_micro.db"
+RESULT_DIR = r"C:\jupyter_notebook\ai_twstock\backtest_micro_simulate\v1\result"
 
 # =================================================================
-# 核心動能邏輯 (獨立實作，不依賴 analyze_momentum.py)
+# 核心動能邏輯
 # =================================================================
 
 def check_vcp_pattern(price_data, sorted_dates, idx):
@@ -96,7 +97,6 @@ def calculate_momentum_score(details, weights=DEFAULT_WEIGHTS):
     score += (min(100, (details['sitc_ratio'] / 1.5) * 100)) * weights['WEIGHT_SITC'] / 100
     score += (details['vcp_score'] if details['vcp_ok'] else 0) * weights['WEIGHT_VCP'] / 100
     score += (details['handover_score'] if details['handover_ok'] else 0) * weights['WEIGHT_HANDOVER'] / 100
-    if details.get('breakout_ok'): score += weights['WEIGHT_BREAKOUT']
     return score
 
 # =================================================================
@@ -123,9 +123,9 @@ def calculate_day_trading_signal(sid, date, data, micro_features):
     sell_idx = (sell_weighted / sell_qty) if sell_qty > 0 else 0
     bs_diff = buy_idx - sell_idx
     if net_score > 20 and bs_diff > 0.1:
-        return {'type': 'REVERSAL', 'strength': min(100, bs_diff * 80), 'reason': f'REVERSAL({bs_diff:.2f})'}
+        return {'type': 'REVERSAL', 'strength': min(100, bs_diff * 80)}
     elif net_score < -20 and bs_diff < -0.1:
-        return {'type': 'FOLLOW', 'strength': min(100, abs(bs_diff) * 60), 'reason': f'FOLLOW({bs_diff:.2f})'}
+        return {'type': 'FOLLOW', 'strength': min(100, abs(bs_diff) * 60)}
     return {'type': None, 'strength': 0.0}
 
 def check_price_volume_alignment(sid, date, data):
@@ -137,7 +137,7 @@ def check_price_volume_alignment(sid, date, data):
     if total_vol <= 0: return {'concentration': 0, 'is_aligned': False}
     concentration = sum([abs(t.get('net', 0)) for t in top_buyers[:5] if t.get('net', 0) > 0]) / total_vol
     gain = (price_info.get('close', 0) - price_info.get('open', 0)) / price_info.get('open', 1)
-    is_aligned = not ((gain > 0.04 and concentration < 0.05) or (concentration > 0.15 and gain < -0.01))
+    is_aligned = not ((gain > 0.05 and concentration < 0.01) or (concentration > 0.20 and gain < -0.02))
     return {'concentration': concentration, 'is_aligned': is_aligned}
 
 def calculate_day_trader_risk(sid, date, data, micro_features):
@@ -152,28 +152,31 @@ def calculate_day_trader_risk(sid, date, data, micro_features):
     return dt_vol / total_vol if total_vol > 0 else 0
 
 def decide_buy(momentum_score, dt_signal, risk_ratio, is_winner_buying, pv_alignment, mode='VOLATILITY'):
-    params = STRATEGY_MODES.get(mode, STRATEGY_MODES['VOLATILITY'])
     concentration = pv_alignment['concentration'] if pv_alignment else 0
-    if mode == 'VOLATILITY':
-        if risk_ratio > params['RISK_LIMIT']: return False, None
-        if concentration < params['MIN_CONCENTRATION']: return False, None
-    elif mode == 'SCALPING':
-        if risk_ratio < params.get('MIN_RISK_RATIO', 0.4): return False, None
-    if pv_alignment and not pv_alignment['is_aligned']: return False, None
-    eff_threshold = 60 # 基礎門檻
-    if mode == 'VOLATILITY':
-        if is_winner_buying: eff_threshold *= 0.7
-        if concentration > 0.10: eff_threshold *= 0.8
-    if dt_signal['type'] == 'REVERSAL' and mode == 'VOLATILITY':
-        if dt_signal['strength'] >= 20: return True, 'REVERSAL'
-    if dt_signal['type'] == 'FOLLOW':
-        if dt_signal['strength'] >= (15 if mode == 'SCALPING' else 25): return True, 'FOLLOW'
-    if momentum_score >= eff_threshold: return True, 'MOMENTUM'
+    if concentration < 0.01: return False, None
+    if risk_ratio > 0.60: return False, None
+    if is_winner_buying and momentum_score > 50: return True, 'BULL_CHARGE'
+    if momentum_score >= 75: return True, 'MOMENTUM_FOLLOW'
     return False, None
 
 # =================================================================
 # 資料載入與回測引擎
 # =================================================================
+
+def load_stock_info():
+    names, industries = {}, {}
+    path = r"C:\jupyter_notebook\ai_twstock\taiwan_stocks.csv"
+    if os.path.exists(path):
+        try:
+            df = pd.read_csv(path)
+            code_col, name_col = df.columns[0], df.columns[1]
+            ind_col = 'industry' if 'industry' in df.columns else None
+            for _, row in df.iterrows():
+                sid = str(row[code_col]).strip()
+                names[sid] = str(row[name_col])
+                if ind_col: industries[sid] = str(row[ind_col])
+        except: pass
+    return names, industries
 
 def load_all_data(db_path, start_date):
     conn = sqlite3.connect(db_path); conn.row_factory = sqlite3.Row; cursor = conn.cursor(); data = {}
@@ -196,11 +199,12 @@ def load_all_data(db_path, start_date):
 
 def run_backtest():
     start_date = "2026-03-01"
-    data = load_all_data(DB_PATH, "2026-01-01") # 提早載入以計算動能
+    data = load_all_data(DB_PATH, "2026-01-01")
     if not data: return
     with open(MICRO_FEATURE_FILE, 'r', encoding='utf-8') as f:
         micro_features = {str(item['id']).strip(): item for item in json.load(f)}
     
+    stock_names, stock_industries = load_stock_info()
     all_dates = sorted(list(set(d for sid in data for d in data[sid].get('price', {}))))
     start_idx = all_dates.index(next(d for d in all_dates if d >= start_date))
     
@@ -209,7 +213,6 @@ def run_backtest():
     print(f"開始回測: {all_dates[start_idx]} -> {all_dates[-1]}")
     for idx in range(start_idx, len(all_dates)):
         current_date = all_dates[idx]
-        # 賣出檢查
         to_sell_list = []
         for sid, pos in list(portfolio.items()):
             if current_date not in data[sid]['price']: continue
@@ -220,59 +223,50 @@ def run_backtest():
             mode = pos['mode']; params = STRATEGY_MODES[mode]
             sell_reason = None; sell_ratio = 1.0
             
-            if mode == 'VOLATILITY' and not pos.get('half_sold') and gain >= 0.08:
-                sell_reason = "分批減碼(+8%)"; sell_ratio = 0.5; pos['half_sold'] = True
-            if not sell_reason:
-                # 移動停損：放寬至 6% 以應對大波動
-                if gain < (pos['max_gain'] - 0.06):
-                    sell_reason = "移動停損"
-                elif gain <= -0.07: # 標準停損
-                    sell_reason = "停損"
-                # 取消固定停利，讓利潤奔跑
+            if mode == 'VOLATILITY' and not pos.get('half_sold') and gain >= 0.10:
+                sell_reason = "分批減碼(+10%)"; sell_ratio = 0.5; pos['half_sold'] = True
             
-            max_days = 1 if mode == 'SCALPING' else (20 if pos.get('half_sold') else 5)
+            if not sell_reason:
+                if gain < (pos['max_gain'] - 0.08): sell_reason = "移動停損"
+                elif gain <= -0.10: sell_reason = "停損"
+            
+            max_days = 1 if mode == 'SCALPING' else (30 if pos.get('half_sold') else 10)
             if not sell_reason and (idx - all_dates.index(pos['buy_date'])) >= max_days: sell_reason = "到期"
             
             if sell_reason:
                 qty = int(pos['shares'] * sell_ratio)
                 if qty < 1000 or sell_ratio == 1.0: qty = pos['shares']
                 cash += qty * curr_p * 0.998
-                transactions.append({'date': current_date, 'sid': sid, 'action': 'SELL', 'gain': gain, 'reason': sell_reason, 'mode': mode})
+                transactions.append({'date': current_date, 'sid': sid, 'action': 'SELL', 'gain': gain, 'reason': sell_reason, 'price': curr_p})
                 if qty >= pos['shares']: to_sell_list.append(sid)
                 else: pos['shares'] -= qty
         for sid in to_sell_list: del portfolio[sid]
 
-        # 買進檢查
         if len(portfolio) < top_n:
             analysis_date = all_dates[idx-1]
             candidates = []
             for sid, details in data.items():
                 if sid in portfolio or analysis_date not in details['price'] or current_date not in details['price']: continue
+                
+                industry = stock_industries.get(sid, "")
+                if "半導體" not in industry: continue
+                
                 p_data = details['price']; sorted_d = sorted(p_data.keys()); a_idx = sorted_d.index(analysis_date)
                 if a_idx < 20: continue
                 
-                # 計算動能細節
                 start_p = p_data[sorted_d[a_idx-20]]['close']
                 if start_p <= 0: continue
                 gain_20 = (p_data[analysis_date]['close'] - start_p) / start_p
-                # 強勢過濾：20天漲幅必須大於 10% 且優於大盤 (假設大盤20天漲5%)
-                if gain_20 < 0.10: continue
+                if gain_20 < 0.05: continue
                 
                 vcp_ok, vcp_s = check_vcp_pattern(p_data, sorted_d, a_idx)
                 hand_ok, hand_s = check_handover_consolidation(p_data, sorted_d, a_idx)
-                
-                # 法人
                 inst = details['institutional'].get(analysis_date, {})
                 f_net = inst.get('Foreign_Investor', {}).get('buy', 0)
                 s_net = inst.get('Investment_Trust', {}).get('buy', 0)
                 
-                mom_details = {
-                    'gain': gain_20, 'vol_ratio': 1.5, 'foreign_days': 3 if f_net > 0 else 0,
-                    'sitc_ratio': 1.2 if s_net > 0 else 0, 'vcp_ok': vcp_ok, 'vcp_score': vcp_s,
-                    'handover_ok': hand_ok, 'handover_score': hand_s
-                }
+                mom_details = {'gain': gain_20, 'vol_ratio': 1.5, 'foreign_days': 3 if f_net > 0 else 0, 'sitc_ratio': 1.2 if s_net > 0 else 0, 'vcp_ok': vcp_ok, 'vcp_score': vcp_s, 'handover_ok': hand_ok, 'handover_score': hand_s}
                 score = calculate_momentum_score(mom_details)
-                if score < 50: continue
                 
                 dt_sig = calculate_day_trading_signal(sid, analysis_date, data, micro_features)
                 risk_ratio = calculate_day_trader_risk(sid, analysis_date, data, micro_features)
@@ -283,24 +277,36 @@ def run_backtest():
                 if top_b and str(top_b[0].get('trader','')).split('/')[-1] in micro_features:
                     if micro_features[str(top_b[0].get('trader','')).split('/')[-1]].get('穩重指數', 0) > 15: is_winner = True
                 
-                mode = 'SCALPING' if risk_ratio > 0.35 else 'VOLATILITY'
+                mode = 'SCALPING' if risk_ratio > 0.40 else 'VOLATILITY'
                 buy, strat = decide_buy(score, dt_sig, risk_ratio, is_winner, pv_align, mode=mode)
                 if buy: candidates.append({'sid': sid, 'score': score, 'mode': mode, 'price': p_data[current_date]['open']})
             
             candidates.sort(key=lambda x: x['score'], reverse=True)
             for cand in candidates[:top_n - len(portfolio)]:
                 buy_price = cand['price']
-                shares = int((cash / (top_n - len(portfolio)) * 0.9) / buy_price / 1000) * 1000
+                shares = int((cash / (top_n - len(portfolio)) * 0.95) / buy_price / 1000) * 1000
                 if shares >= 1000:
                     cost = shares * buy_price * 1.002
                     if cash >= cost:
                         cash -= cost
                         portfolio[cand['sid']] = {'shares': shares, 'avg_price': buy_price, 'buy_date': current_date, 'mode': cand['mode']}
-                        transactions.append({'date': current_date, 'sid': cand['sid'], 'action': 'BUY', 'mode': cand['mode']})
+                        transactions.append({'date': current_date, 'sid': cand['sid'], 'action': 'BUY', 'price': buy_price})
 
-    final_v = cash + sum(p['shares'] * data[s]['price'][all_dates[-1]]['close'] for s, p in portfolio.items())
+    final_v = cash + sum(p['shares'] * data[s]['price'][all_dates[-1]]['close'] for s, p in portfolio.items() if all_dates[-1] in data[s]['price'])
     print(f"\n回測結束! 最終價值: {final_v:,.0f} (報酬率: {(final_v-2000000)/2000000:.1%})")
-    print(f"0050 基準漲幅: 25.0%")
+    
+    os.makedirs(RESULT_DIR, exist_ok=True)
+    log_path = os.path.join(RESULT_DIR, "transaction_log.txt")
+    with open(log_path, 'w', encoding='utf-8') as f:
+        f.write(f"=== 交易流水帳 (3月至今 - 半導體鎖定) ===\n")
+        f.write(f"起始資金: 2,000,000 | 最終價值: {final_v:,.0f}\n")
+        f.write("-" * 80 + "\n")
+        f.write(f"{'日期':<12} | {'代號':<6} | {'動作':<4} | {'價格':<8} | {'獲利':<8} | {'原因':<20}\n")
+        f.write("-" * 80 + "\n")
+        for t in transactions:
+            gain_str = f"{t.get('gain', 0):.1%}" if t['action'] == 'SELL' else "-"
+            f.write(f"{t['date']:<12} | {t['sid']:<6} | {t['action']:<4} | {t.get('price', 0):<8.2f} | {gain_str:<8} | {t.get('reason', ''):<20}\n")
+    print(f"交易流水帳已匯出至: {log_path}")
 
 if __name__ == "__main__":
     run_backtest()
