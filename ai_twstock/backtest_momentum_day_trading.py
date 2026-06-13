@@ -266,7 +266,7 @@ def run_backtest():
                 qty = int(pos['shares'] * sell_ratio)
                 if qty < 1000 or sell_ratio == 1.0: qty = pos['shares']
                 cash += qty * curr_p * 0.998
-                transactions.append({'date': current_date, 'sid': sid, 'action': 'SELL', 'gain': gain, 'reason': sell_reason, 'price': curr_p})
+                transactions.append({'date': current_date, 'sid': sid, 'action': 'SELL', 'gain': gain, 'reason': sell_reason, 'price': curr_p, 'mode': mode})
                 if qty >= pos['shares']: to_sell_list.append(sid)
                 else: pos['shares'] -= qty
         for sid in to_sell_list: del portfolio[sid]
@@ -330,15 +330,33 @@ def run_backtest():
                     if cash >= cost:
                         cash -= cost
                         portfolio[cand['sid']] = {'shares': shares, 'avg_price': buy_price, 'buy_date': current_date, 'mode': cand['mode']}
-                        transactions.append({'date': current_date, 'sid': cand['sid'], 'action': 'BUY', 'price': buy_price})
+                        transactions.append({'date': current_date, 'sid': cand['sid'], 'action': 'BUY', 'price': buy_price, 'mode': cand['mode']})
 
     final_v = cash + sum(p['shares'] * data[s]['price'][all_dates[-1]]['close'] for s, p in portfolio.items() if all_dates[-1] in data[s]['price'])
+    
+    all_sells = [t for t in transactions if t['action'] == 'SELL']
+    mode_stats = {}
+    for m in STRATEGY_MODES.keys():
+        m_sells = [t for t in all_sells if t.get('mode') == m]
+        m_gains = [t['gain'] for t in m_sells]
+        mode_stats[m] = {
+            'count': len(m_sells),
+            'win_rate': len([g for g in m_gains if g > 0]) / len(m_gains) if m_gains else 0,
+            'avg_return': sum(m_gains) / len(m_gains) if m_gains else 0
+        }
+
     print(f"\n回測結束! 最終價值: {final_v:,.0f} (報酬率: {(final_v-2000000)/2000000:.1%})")
+    print("\n" + "="*60)
+    print(f"{'模式':<15} | {'交易次數':<8} | {'勝率':<8} | {'平均報酬':<10}")
+    print("-" * 60)
+    for m, s in mode_stats.items():
+        print(f"{m:<15} | {s['count']:>8} | {s['win_rate']:>8.1%} | {s['avg_return']:>10.2%}")
+    print("="*60)
     
     os.makedirs(RESULT_DIR, exist_ok=True)
     log_path = os.path.join(RESULT_DIR, "transaction_log.txt")
     with open(log_path, 'w', encoding='utf-8') as f:
-        f.write(f"=== 交易流水帳 (3月至今 - 半導體鎖定) ===\n")
+        f.write(f"=== 交易流水帳 (3月至今 - 四模式版) ===\n")
         f.write(f"起始資金: 2,000,000 | 最終價值: {final_v:,.0f}\n")
         f.write("-" * 80 + "\n")
         f.write(f"{'日期':<12} | {'代號':<6} | {'動作':<4} | {'價格':<8} | {'獲利':<8} | {'原因':<20}\n")
