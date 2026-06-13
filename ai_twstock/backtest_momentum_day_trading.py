@@ -272,31 +272,26 @@ def calculate_day_trader_risk(sid: str, date: str, data: dict, micro_features: d
 
 def decide_buy(momentum_score: float, dt_signal: dict, risk_ratio: float = 0, is_winner_buying: bool = False, mom_threshold: float = LOOSE_BUY_SCORE_THRESHOLD, use_strict_reversal: bool = True) -> tuple:
     """
-    優化後的買進決策：整合動能、隔日沖風險與贏家行為
+    修正後的買進決策：放寬過濾器，恢復靈敏度
     """
-    # 1. 隔日沖風險過濾 (若佔比 > 35% 則視為高風險，震盪盤需更嚴格)
-    if risk_ratio > 0.35:
+    # 1. 隔日沖風險過濾 (放寬至 50%，避免誤殺強勢換手)
+    if risk_ratio > 0.50:
         return False, None, f'隔日沖風險過高({risk_ratio:.1%})'
 
-    # 2. 贏家加持：若贏家在買，放寬動能門檻 30% (增加對主力股的敏感度)
-    effective_threshold = mom_threshold * 0.7 if is_winner_buying else mom_threshold
+    # 2. 贏家加持：若贏家在買，放寬動能門檻 20%
+    effective_threshold = mom_threshold * 0.8 if is_winner_buying else mom_threshold
 
-    # 3. 策略優先級調整
+    # 3. 策略優先級調整 (恢復原始靈敏度)
     if dt_signal['type'] == 'REVERSAL':
         if use_strict_reversal and '買賣指數正向' not in dt_signal['reason']:
             return False, None, ''
-        # 增加強度要求，避免小反彈
-        if dt_signal['strength'] >= 35:
+        if dt_signal['strength'] >= 25: # 調回 25
             return True, 'REVERSAL', dt_signal['reason']
             
-    if dt_signal['type'] == 'FOLLOW' and dt_signal['strength'] >= 30:
+    if dt_signal['type'] == 'FOLLOW' and dt_signal['strength'] >= 20: # 調回 20
         return True, 'FOLLOW', dt_signal['reason']
         
     if momentum_score >= effective_threshold:
-        # 如果動能極高但沒有贏家，且風險佔比中等(20-35%)，則降級或不買
-        if momentum_score < 100 and not is_winner_buying and risk_ratio > 0.2:
-             return False, None, f'動能不足以覆蓋風險(Risk:{risk_ratio:.1%})'
-             
         reason = f'動能分數 {momentum_score:.1f}'
         if is_winner_buying: reason += " (贏家同步)"
         return True, 'MOMENTUM', reason
@@ -476,18 +471,15 @@ def run_momentum_day_trading_backtest(override_config: dict = None, silent: bool
                 dt_sig = calculate_day_trading_signal(sid, analysis_date, data, micro_features)
                 risk_ratio = calculate_day_trader_risk(sid, analysis_date, data, micro_features)
                 
-                # 強化贏家邏輯：前五大買家是否有 3 個以上是「穩重分點」
+                # 修正贏家邏輯：只要買一或買二分點是「穩重分點」即視為贏家同步
                 is_winner_buying = False
                 report = data.get(sid, {}).get('trading_daily_report', {}).get(analysis_date, {})
                 top_buyers = report.get('top_buyers', [])
-                if len(top_buyers) >= 5:
-                    stable_count = 0
-                    for tb in top_buyers[:5]:
-                        t_bid = str(tb.get('trader', '')).split('/')[-1].strip()
-                        if t_bid in micro_features and micro_features[t_bid].get('穩重指數', 0) > 15:
-                            stable_count += 1
-                    if stable_count >= 3:
+                for tb in top_buyers[:2]:
+                    t_bid = str(tb.get('trader', '')).split('/')[-1].strip()
+                    if t_bid in micro_features and micro_features[t_bid].get('穩重指數', 0) > 15:
                         is_winner_buying = True
+                        break
 
                 buy, strat, reason = decide_buy(mom_score, dt_sig, risk_ratio=risk_ratio, is_winner_buying=is_winner_buying, mom_threshold=buy_score_threshold, use_strict_reversal=use_strict_reversal)
                 if buy:
