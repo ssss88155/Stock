@@ -28,7 +28,7 @@ except Exception:
 DEFAULT_WEIGHTS = {
     'WEIGHT_GAIN': 40, 'WEIGHT_VOLUME': 10, 'WEIGHT_FOREIGN': 10,
     'WEIGHT_SITC': 10, 'WEIGHT_VCP': 10, 'WEIGHT_BREAKOUT': 10,
-    'WEIGHT_HANDOVER': 40, 'MIN_SCORE_TO_PRINT': 60, 'MIN_TRADING_VALUE': 30000000,
+    'WEIGHT_HANDOVER': 40, 'MIN_SCORE_TO_PRINT': 60, 'MIN_TRADING_VALUE': 20000000,
 }
 
 # 三模式設定
@@ -223,7 +223,7 @@ def run_backtest():
     all_dates = sorted(list(set(d for sid in data for d in data[sid].get('price', {}))))
     start_idx = all_dates.index(next(d for d in all_dates if d >= start_date))
     
-    cash = 2000000; portfolio = {}; transactions = []; top_n = 10
+    cash = 2000000; portfolio = {}; transactions = []; top_n = 15 # 擴大持股，全額參與牛市
     
     print(f"開始回測: {all_dates[start_idx]} -> {all_dates[-1]}")
     for idx in range(start_idx, len(all_dates)):
@@ -238,12 +238,24 @@ def run_backtest():
             mode = pos['mode']; params = STRATEGY_MODES.get(mode, STRATEGY_MODES['VOLATILITY'])
             sell_reason = None; sell_ratio = 1.0
             
-            if mode in ['VOLATILITY', 'LOW_ENTRY'] and not pos.get('half_sold') and gain >= 0.10:
-                sell_reason = f"分批減碼({mode}) (+10%)"; sell_ratio = 0.5; pos['half_sold'] = True
+            # 1. 階梯式分批出場邏輯 (優化：取消 30% 全清，改為動態移動停損)
+            if mode in ['VOLATILITY', 'LOW_ENTRY']:
+                # 第一階段：10% 減碼一半，鎖定基本利潤
+                if not pos.get('half_sold') and gain >= 0.10:
+                    sell_reason = f"分批減碼({mode}) (+10%)"
+                    sell_ratio = 0.5
+                    pos['half_sold'] = True
             
             if not sell_reason:
-                if gain < (pos['max_gain'] - 0.08): sell_reason = "移動停損"
-                elif gain <= -0.10: sell_reason = "停損"
+                # 移動停損保護 (獲利越高，停損越緊，鎖住大波段)
+                trailing_limit = 0.08
+                if gain > 0.30: trailing_limit = 0.05 # 獲利超過 30%，回落 5% 就跑
+                if gain > 0.50: trailing_limit = 0.03 # 獲利超過 50%，回落 3% 就跑
+                
+                if gain < (pos['max_gain'] - trailing_limit):
+                    sell_reason = f"移動停損({mode})"
+                elif gain <= -0.10:
+                    sell_reason = "停損"
             
             if mode == 'SCALPING': max_days = 1
             elif mode == 'LOW_ENTRY': max_days = 40
@@ -276,9 +288,9 @@ def run_backtest():
                 if ind == "其他": continue
                 sector_scores[ind].append(gain_20)
             
-            # 計算產業平均漲幅並取 Top 3 (要求產業至少有 5 檔股票具備代表性)
-            avg_sector_gain = {ind: sum(gains)/len(gains) for ind, gains in sector_scores.items() if len(gains) >= 5}
-            top_sectors = sorted(avg_sector_gain.items(), key=lambda x: x[1], reverse=True)[:3]
+            # 計算產業平均漲幅並取 Top 5 (牛市中放寬產業限制，確保資金利用率)
+            avg_sector_gain = {ind: sum(gains)/len(gains) for ind, gains in sector_scores.items() if len(gains) >= 3}
+            top_sectors = sorted(avg_sector_gain.items(), key=lambda x: x[1], reverse=True)[:5]
             top_sector_names = [x[0] for x in top_sectors]
             
             candidates = []
