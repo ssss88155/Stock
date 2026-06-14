@@ -44,7 +44,7 @@ def import_prices(conn, json_path):
     if not os.path.exists(json_path): return
     cursor = conn.cursor()
     batch_data = []
-    batch_size = 10000
+    batch_size = 50000
     with open(json_path, 'r', encoding='utf-8') as f:
         parser = ijson.kvitems(f, '')
         for sid, info in parser:
