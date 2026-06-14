@@ -262,22 +262,9 @@ def decide_buy(momentum_score, dt_signal, risk_ratio, is_winner_buying, pv_align
             dip_score = calculate_dip_score(dip_details)
             return True, ('WASH_OUT_DIP', dip_score)
 
-    # B. HOLY_GRAIL_BREAKOUT (聖盃模式) - 需大多頭
-    if is_bull_market:
-        is_vol_dry = curr_vol < (prev_vol * HOLY_GRAIL_PARAMS['VOL_DRY_RATIO'])
-        prev_report = stock_info.get('trading_daily_report', {}).get(prev_date, {})
-        curr_report = stock_info.get('trading_daily_report', {}).get(date, {})
-        prev_top_b = prev_report.get('top_buyers', [])
-        is_winner_locked = False
-        if prev_top_b:
-            winner_bid = str(prev_top_b[0].get('trader_id', '')).strip()
-            winner_selling = sum([abs(ts.get('net', 0)) for ts in curr_report.get('top_sellers', [])[:5] if winner_bid == str(ts.get('trader_id', ''))])
-            if winner_selling < (abs(prev_top_b[0].get('net', 0)) * HOLY_GRAIL_PARAMS['WINNER_LOCK_RATIO']):
-                is_winner_locked = True
-        
-        if (prev_gain > HOLY_GRAIL_PARAMS['PREV_GAIN_THRESHOLD'] and is_vol_dry and is_winner_locked and
-            curr_p['close'] >= prev_p['close'] * HOLY_GRAIL_PARAMS['PRICE_SUPPORT_LEVEL']):
-            return True, ('HOLY_GRAIL_BREAKOUT', momentum_score)
+    # B. HOLY_GRAIL_BREAKOUT (聖盃模式) - 已關閉
+    # if is_bull_market:
+    #     ... (邏輯已註解)
 
     return False, None
 
