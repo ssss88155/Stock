@@ -155,42 +155,119 @@ def calculate_day_trader_risk(sid, date, data, micro_features):
         if bid in micro_features and micro_features[bid].get('穩重指數', 0) < -50: dt_vol += qty
     return dt_vol / total_vol if total_vol > 0 else 0
 
-def decide_buy(momentum_score, dt_signal, risk_ratio, is_winner_buying, pv_alignment, mode='VOLATILITY', sid=None, date=None, data=None):
-    if sid and date and data:
-        if HOLY_GRAIL_PARAMS.get('USE_MARKET_FILTER', False):
-            if '0050' in data:
-                p0050 = data['0050'].get('price', {})
-                sorted_0050 = sorted(p0050.keys())
-                if date in sorted_0050:
-                    idx_0050 = sorted_0050.index(date)
-                    if idx_0050 >= 60:
-                        def get_ma_0050(n, end_idx): return sum([p0050[sorted_0050[i]]['close'] for i in range(end_idx-n+1, end_idx+1)]) / n
-                        ma20 = get_ma_0050(20, idx_0050)
-                        ma60 = get_ma_0050(60, idx_0050)
-                        # 大多頭驅動：價格 > MA20 且 MA20 > MA60
-                        if p0050[date]['close'] > ma20 and ma20 > ma60: pass
-                        else: return False, None
+def check_uptrend_and_support(sid, date, data):
+    """
+    確認個股是否處於上行趨勢，並找出最近的支撐點
+    1. 價格 > MA20 (短期趨勢向上)
+    2. 找出過去 20 天的最低價作為支撐點
+    """
+    stock_info = data.get(sid, {})
+    price_data = stock_info.get('price', {})
+    sorted_dates = sorted(price_data.keys())
+    if date not in sorted_dates: return False, 0
+    idx = sorted_dates.index(date)
+    if idx < 20: return False, 0
+    
+    lookback_20 = sorted_dates[idx-20:idx]
+    prices_20 = [price_data[d]['close'] for d in lookback_20]
+    ma20 = sum(prices_20) / 20
+    curr_p = price_data[date]['close']
+    
+    # 支撐點：過去 20 天的最低收盤價
+    support_p = min(prices_20)
+    
+    # 上行趨勢定義：價格在 MA20 之上
+    is_uptrend = curr_p > ma20
+    return is_uptrend, support_p
+
+def check_broker_dumping(sid, date, data, micro_features):
+    """
+    檢查是否有「隔日沖」或「短線券商」在大量倒貨
+    1. 賣方前五名中，是否有穩重指數極低 (< -50) 的券商
+    2. 這些券商的賣出量是否佔今日成交量顯著比例
+    """
+    stock_info = data.get(sid, {})
+    report = stock_info.get('trading_daily_report', {}).get(date, {})
+    price_info = stock_info.get('price', {}).get(date, {})
+    total_vol = price_info.get('Trading_Volume', 0)
+    if total_vol <= 0: return False
+    
+    top_sellers = report.get('top_sellers', [])
+    dumping_vol = 0
+    for t in top_sellers[:5]:
+        bid = str(t.get('trader_id', '')).strip()
+        if bid in micro_features and micro_features[bid].get('穩重指數', 0) < -50:
+            dumping_vol += abs(t.get('net', 0))
+            
+    # 如果短線券商賣壓超過今日成交量 10%，視為倒貨風險
+    return (dumping_vol / total_vol) > 0.10
+
+def decide_buy(momentum_score, dt_signal, risk_ratio, is_winner_buying, pv_alignment, mode='VOLATILITY', sid=None, date=None, data=None, micro_features=None):
+    if not (sid and date and data): return False, None
+    
+    # 1. 大盤環境判定 (Regime Detection)
+    is_bull_market = True
+    if HOLY_GRAIL_PARAMS.get('USE_MARKET_FILTER', False) and '0050' in data:
+        p0050 = data['0050'].get('price', {})
+        sorted_0050 = sorted(p0050.keys())
+        if date in sorted_0050:
+            idx_0050 = sorted_0050.index(date)
+            if idx_0050 >= 60:
+                def get_ma_0050(n, end_idx): return sum([p0050[sorted_0050[i]]['close'] for i in range(end_idx-n+1, end_idx+1)]) / n
+                ma20 = get_ma_0050(20, idx_0050)
+                ma60 = get_ma_0050(60, idx_0050)
+                # 大多頭定義：價格 > MA20 且 MA20 > MA60
+                is_bull_market = p0050[date]['close'] > ma20 and ma20 > ma60
+
+    # 2. 取得個股量價與籌碼資料
+    stock_info = data.get(sid, {})
+    price_data = stock_info.get('price', {})
+    sorted_dates = sorted(price_data.keys())
+    if date not in sorted_dates: return False, None
+    idx = sorted_dates.index(date)
+    if idx < 1: return False, None
+    
+    prev_date = sorted_dates[idx-1]
+    curr_p, prev_p = price_data[date], price_data[prev_date]
+    prev_gain = (prev_p['close'] - prev_p['open']) / prev_p['open'] if prev_p['open'] > 0 else 0
+    curr_vol = curr_p.get('Trading_Volume', 0)
+    prev_vol = prev_p.get('Trading_Volume', 0)
+    
+    # 3. 模式判定邏輯
+    
+    # A. WASH_OUT_DIP (洗盤抄底模式) - 優先判定，具備大盤豁免權
+    # 邏輯：昨日大跌(洗盤) + 今日縮量止跌 + 籌碼未散
+    is_wash_out = prev_gain < -0.03 and curr_vol < prev_vol * 0.7 and curr_p['close'] >= prev_p['close'] * 0.98
+    
+    if is_wash_out:
+        # 額外檢查：是否在上行趨勢中 (回檔而非轉空)
+        is_uptrend, support_p = check_uptrend_and_support(sid, date, data)
+        # 額外檢查：是否有短線券商倒貨
+        is_dumping = check_broker_dumping(sid, date, data, micro_features)
         
-        stock_info = data.get(sid, {})
-        price_data = stock_info.get('price', {})
-        sorted_dates = sorted(price_data.keys())
-        if date not in sorted_dates: return False, None
-        idx = sorted_dates.index(date)
-        if idx < 1: return False, None
-        prev_date = sorted_dates[idx-1]
-        curr_p, prev_p = price_data[date], price_data[prev_date]
-        prev_gain = (prev_p['close'] - prev_p['open']) / prev_p['open'] if prev_p['open'] > 0 else 0
-        is_vol_dry = curr_p.get('Trading_Volume', 0) < (prev_p.get('Trading_Volume', 0) * HOLY_GRAIL_PARAMS['VOL_DRY_RATIO'])
-        prev_report = stock_info.get('trading_daily_report', {}).get(prev_date, {})
-        curr_report = stock_info.get('trading_daily_report', {}).get(date, {})
-        prev_top_b = prev_report.get('top_buyers', [])
-        is_winner_locked = False
-        if prev_top_b:
-            winner_bid = str(prev_top_b[0].get('trader_id', '')).strip()
-            winner_selling = sum([abs(ts.get('net', 0)) for ts in curr_report.get('top_sellers', [])[:5] if winner_bid == str(ts.get('trader_id', ''))])
-            if winner_selling < (abs(prev_top_b[0].get('net', 0)) * HOLY_GRAIL_PARAMS['WINNER_LOCK_RATIO']): is_winner_locked = True
-        if (prev_gain > HOLY_GRAIL_PARAMS['PREV_GAIN_THRESHOLD'] and is_vol_dry and is_winner_locked and curr_p['close'] >= prev_p['close'] * HOLY_GRAIL_PARAMS['PRICE_SUPPORT_LEVEL']):
-            return True, 'HOLY_GRAIL_BREAKOUT'
+        if is_uptrend and not is_dumping:
+            return True, 'WASH_OUT_DIP'
+
+    # B. 需在大多頭環境下才啟動的模式
+    if not is_bull_market:
+        return False, None
+
+    # HOLY_GRAIL_BREAKOUT (聖盃突破模式)
+    is_vol_dry = curr_vol < (prev_vol * HOLY_GRAIL_PARAMS['VOL_DRY_RATIO'])
+    prev_report = stock_info.get('trading_daily_report', {}).get(prev_date, {})
+    curr_report = stock_info.get('trading_daily_report', {}).get(date, {})
+    prev_top_b = prev_report.get('top_buyers', [])
+    is_winner_locked = False
+    if prev_top_b:
+        winner_bid = str(prev_top_b[0].get('trader_id', '')).strip()
+        winner_selling = sum([abs(ts.get('net', 0)) for ts in curr_report.get('top_sellers', [])[:5] if winner_bid == str(ts.get('trader_id', ''))])
+        if winner_selling < (abs(prev_top_b[0].get('net', 0)) * HOLY_GRAIL_PARAMS['WINNER_LOCK_RATIO']):
+            is_winner_locked = True
+            
+    if (prev_gain > HOLY_GRAIL_PARAMS['PREV_GAIN_THRESHOLD'] and is_vol_dry and is_winner_locked and
+        curr_p['close'] >= prev_p['close'] * HOLY_GRAIL_PARAMS['PRICE_SUPPORT_LEVEL']):
+        return True, 'HOLY_GRAIL_BREAKOUT'
+
     return False, None
 
 # =================================================================
@@ -258,7 +335,7 @@ def load_all_data(db_path, start_date):
     return data
 
 def run_backtest():
-    start_date = "2026-01-02"
+    start_date = "2026-03-01"
     start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
     data_date_str = (start_date_obj - timedelta(days=90)).strftime("%Y-%m-%d")
     data = load_all_data(DB_PATH, data_date_str)
@@ -317,7 +394,7 @@ def run_backtest():
             candidates = []
             for sid, details in data.items():
                 if sid in portfolio or analysis_date not in details['price'] or current_date not in details['price']: continue
-                if stock_industries.get(sid) not in top_sector_names: continue
+                
                 p_data = details['price']; sorted_d = sorted(p_data.keys()); a_idx = sorted_d.index(analysis_date)
                 start_p = p_data[sorted_d[a_idx-20]]['close']
                 gain_20 = (p_data[analysis_date]['close'] - start_p) / start_p if start_p > 0 else 0
@@ -329,8 +406,17 @@ def run_backtest():
                 if top_b_list:
                     bid = str(top_b_list[0].get('trader_id','')).strip()
                     if bid in micro_features and micro_features[bid].get('穩重指數', 0) > 15: is_winner = True
-                buy, strat = decide_buy(score, dt_sig, risk_ratio, is_winner, pv_align, mode='HOLY_GRAIL_BREAKOUT', sid=sid, date=analysis_date, data=data)
-                if buy: candidates.append({'sid': sid, 'score': score, 'mode': 'HOLY_GRAIL_BREAKOUT', 'price': p_data[current_date]['open'], 'strategy': strat})
+                
+                # 執行買入判定
+                buy, strat = decide_buy(score, dt_sig, risk_ratio, is_winner, pv_align, mode='HOLY_GRAIL_BREAKOUT', sid=sid, date=analysis_date, data=data, micro_features=micro_features)
+                
+                if buy:
+                    # 如果是聖盃模式，需額外檢查產業過濾
+                    if strat == 'HOLY_GRAIL_BREAKOUT':
+                        if stock_industries.get(sid) not in top_sector_names:
+                            continue
+                    
+                    candidates.append({'sid': sid, 'score': score, 'mode': strat, 'price': p_data[current_date]['open'], 'strategy': strat})
             candidates.sort(key=lambda x: x['score'], reverse=True)
             for cand in candidates[:top_n - len(portfolio)]:
                 buy_price = cand['price']
