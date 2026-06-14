@@ -87,6 +87,14 @@ def load_stock_data(filename='stock_data.json', script_file=None):
     sync_independent_data(path, 'data_independent')
     
     if os.path.exists(path):
+        # 如果檔案大於 100MB，不建議使用 json.load() 全量載入
+        file_size = os.path.getsize(path)
+        if file_size > 100 * 1024 * 1024:
+            print(f"[WARNING] {filename} is too large ({file_size/1024/1024:.1f}MB).")
+            print(f"[INFO] Please use load_independent_stock_data() to read specific stock instead.")
+            # 為了不讓程式崩潰，大檔案模式下不快取全量資料，回傳空字典或引導使用小檔
+            return {}
+
         with open(path, 'r', encoding='utf-8') as f:
             try:
                 data = json.load(f)
@@ -113,6 +121,12 @@ def load_stock_data_micro(filename='stock_data_micro.json', script_file=None):
     sync_independent_data(path, 'data_independent_microstructure')
     
     if os.path.exists(path):
+        # 如果檔案大於 100MB，不建議使用 json.load() 全量載入
+        file_size = os.path.getsize(path)
+        if file_size > 100 * 1024 * 1024:
+            print(f"[WARNING] {filename} is too large ({file_size/1024/1024:.1f}MB).")
+            return {}
+
         with open(path, 'r', encoding='utf-8') as f:
             try:
                 data = json.load(f)
