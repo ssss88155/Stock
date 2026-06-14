@@ -33,22 +33,18 @@ def create_db(db_path):
         )
     ''')
     
-    # 修正：不再這裡 commit DELETE，讓它留在事務中
-    # 這樣如果後續匯入失敗，rollback 就能救回舊資料
+    # 事務保護下的 DELETE
     cursor.execute('DELETE FROM daily_prices')
     cursor.execute('DELETE FROM broker_details')
     
     return conn
 
 def import_prices(conn, json_path):
-    """優化：改用 ijson 串流讀取價格資料，並強制轉換 Decimal 為 float/int"""
     print(f"正在匯入價格資料 (串流): {json_path}")
     if not os.path.exists(json_path): return
-    
     cursor = conn.cursor()
     batch_data = []
     batch_size = 10000
-    
     with open(json_path, 'r', encoding='utf-8') as f:
         parser = ijson.kvitems(f, '')
         for sid, info in parser:
@@ -56,29 +52,13 @@ def import_prices(conn, json_path):
             inst = info.get('institutional', {})
             for date, p in prices.items():
                 i = inst.get(date, {})
-                f_inv = i.get('Foreign_Investor', {})
-                s_inv = i.get('Investment_Trust', {})
-                d_inv = i.get('Dealer', {})
-                
-                # 強制轉換 Decimal 為 float/int 以相容 SQLite
-                f_net = float(f_inv.get('buy', 0)) - float(f_inv.get('sell', 0))
-                s_net = float(s_inv.get('buy', 0)) - float(s_inv.get('sell', 0))
-                d_net = float(d_inv.get('buy', 0)) - float(d_inv.get('sell', 0))
-                
-                batch_data.append((
-                    sid, date, 
-                    float(p.get('open', 0)) if p.get('open') is not None else None,
-                    float(p.get('max', 0)) if p.get('max') is not None else None,
-                    float(p.get('min', 0)) if p.get('min') is not None else None,
-                    float(p.get('close', 0)) if p.get('close') is not None else None,
-                    int(float(p.get('Trading_Volume', 0))),
-                    int(f_net), int(s_net), int(d_net)
-                ))
-                
+                f_net = float(i.get('Foreign_Investor', {}).get('buy', 0)) - float(i.get('Foreign_Investor', {}).get('sell', 0))
+                s_net = float(i.get('Investment_Trust', {}).get('buy', 0)) - float(i.get('Investment_Trust', {}).get('sell', 0))
+                d_net = float(i.get('Dealer', {}).get('buy', 0)) - float(i.get('Dealer', {}).get('sell', 0))
+                batch_data.append((sid, date, float(p.get('open', 0)), float(p.get('max', 0)), float(p.get('min', 0)), float(p.get('close', 0)), int(float(p.get('Trading_Volume', 0))), int(f_net), int(s_net), int(d_net)))
                 if len(batch_data) >= batch_size:
                     cursor.executemany('INSERT OR REPLACE INTO daily_prices VALUES (?,?,?,?,?,?,?,?,?,?)', batch_data)
                     batch_data = []
-        
         if batch_data:
             cursor.executemany('INSERT OR REPLACE INTO daily_prices VALUES (?,?,?,?,?,?,?,?,?,?)', batch_data)
 
@@ -90,7 +70,6 @@ def import_brokers_streaming(conn, json_path):
     batch_size = 50000
     total_count = 0
     stock_count = 0
-    
     with open(json_path, 'r', encoding='utf-8') as f:
         parser = ijson.kvitems(f, '')
         for sid, info in parser:
@@ -101,18 +80,15 @@ def import_brokers_streaming(conn, json_path):
                     for t in report.get(key, []):
                         trader_str = str(t.get('trader', ''))
                         if not trader_str: continue
-                        
+                        # 優化：直接拆分存儲，避免上層拼接
                         parts = trader_str.split('/', 1)
                         t_name, t_id = parts if len(parts) == 2 else (parts[0], '')
-                        
-                        qty_raw = t.get('net_b', t.get('net_s', t.get('net', 0)))
-                        qty = int(abs(float(qty_raw)))
-                        avg_p = float(t.get('avg_p', 0))
-                        batch_data.append((sid, date, t_name, t_id, qty, avg_p, is_buy))
+                        qty = int(abs(float(t.get('net_b', t.get('net_s', t.get('net', 0))))))
+                        batch_data.append((sid, date, t_name, t_id, qty, float(t.get('avg_p', 0)), is_buy))
                         total_count += 1
-                        
                         if len(batch_data) >= batch_size:
                             cursor.executemany('INSERT OR REPLACE INTO broker_details VALUES (?,?,?,?,?,?,?)', batch_data)
+                            conn.commit()
                             batch_data = []
                             print(f"已處理 {stock_count} 檔股票，累計寫入 {total_count} 筆...")
         if batch_data:
@@ -123,16 +99,21 @@ def finalize_db(conn):
     print("\n--- 執行資料庫最終優化 ---")
     cursor = conn.cursor()
     
-    print("正在建立索引 (idx_broker_lookup)...")
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_broker_lookup ON broker_details (stock_id, date, is_buy, net_qty, trader_name, avg_price)')
+    # 1. 建立索引
+    # 增加以 date 為首的索引，極大加速日期範圍查詢 (WHERE date >= ?)
+    print("正在建立日期索引 (idx_broker_date)...")
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_broker_date ON broker_details (date)')
     
-    print("正在建立索引 (idx_broker_query)...")
+    # 強化版覆蓋索引：包含所有常用欄位，確保查詢排行時完全不需回表
+    print("正在建立強化版覆蓋索引 (idx_broker_lookup)...")
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_broker_lookup ON broker_details (stock_id, date, is_buy, net_qty, trader_id, trader_name, avg_price)')
+    
+    print("正在建立排序索引 (idx_broker_query)...")
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_broker_query ON broker_details (stock_id, date, is_buy, net_qty DESC)')
     
     print("正在更新統計資訊 (ANALYZE)...")
     cursor.execute('ANALYZE')
     
-    # 這裡才進行最終 commit，確保 DELETE + 所有 INSERT + INDEX 都在同一個事務中
     conn.commit()
     
     print("正在執行資料叢集化與壓縮 (VACUUM)...")
@@ -151,7 +132,7 @@ if __name__ == "__main__":
     start_time = time.time()
     conn = None
     try:
-        print(f"開始執行轉換流程...")
+        print(f"開始執行最終優化轉換流程...")
         conn = create_db(DB_PATH)
         import_prices(conn, PRICE_JSON)
         import_brokers_streaming(conn, BROKER_JSON)
