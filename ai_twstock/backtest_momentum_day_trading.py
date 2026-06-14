@@ -40,6 +40,27 @@ except Exception:
 # =================================================================
 sys.path.append(os.path.join(os.path.dirname(__file__), 'backtest_micro_simulate', 'v1', 'config'))
 
+# =================================================================
+# 全域開關與流程控制 (Pipeline Switches)
+# =================================================================
+PIPELINE_CONTROL = {
+    # 階段開關
+    'ENABLE_SECTOR_SCAN': True,      # 1. 產業動能掃描 (相依性: 影響個股篩選池)
+    'ENABLE_FEATURE_EXTRACT': True,  # 2. 個股特徵提取 (相依性: 基礎資料流)
+    'ENABLE_MOMENTUM_SCORE': True,   # 3. 綜合動能評分 (相依性: 影響順勢模式排序)
+    'ENABLE_DIP_SCORE': True,        # 3. 抄底專用評分 (相依性: 影響逆勢模式排序)
+    'ENABLE_SECONDARY_INDICATORS': True, # 4. 輔助指標計算 (當沖/風險/量價)
+    
+    # 買進策略開關 (相依性: 需在 decide_buy 中執行)
+    'STRATEGY_SWITCH': {
+        'HOLY_GRAIL_BREAKOUT': False, # 聖盃突破模式 (相依性: 需大多頭環境)
+        'WASH_OUT_DIP': True,         # 洗盤抄底模式 (相依性: 具備大盤豁免權)
+        'VOLATILITY': False,          # 波動率模式   (相依性: 需高動能評分)
+        'SCALPING': False,            # 極短線模式   (相依性: 需當沖訊號)
+        'LOW_ENTRY': False            # 低位階模式   (相依性: 需低動能評分)
+    }
+}
+
 # 預設參數 (2026 年最強版本)
 HOLY_GRAIL_PARAMS = {'PREV_GAIN_THRESHOLD': 0.05, 'VOL_DRY_RATIO': 0.65, 'WINNER_LOCK_RATIO': 0.15, 'PRICE_SUPPORT_LEVEL': 0.97, 'USE_MARKET_FILTER': True}
 STRATEGY_MODES = {
@@ -247,24 +268,49 @@ def decide_buy(momentum_score, dt_signal, risk_ratio, is_winner_buying, pv_align
     curr_vol = curr_p.get('Trading_Volume', 0)
     prev_vol = prev_p.get('Trading_Volume', 0)
     
-    # 3. 模式判定邏輯
+    # 3. 模式判定邏輯 (受 PIPELINE_CONTROL['STRATEGY_SWITCH'] 控制)
+    switches = PIPELINE_CONTROL['STRATEGY_SWITCH']
     
-    # A. WASH_OUT_DIP (抄底模式) - 獨立評分流
-    is_wash_out_base = prev_gain < -0.03 and curr_vol < prev_vol * 0.8
-    if is_wash_out_base:
-        # 抄底條件：1.收紅棒(止跌) 2.接近支撐 3.券商沒倒貨
-        is_red = curr_p['close'] > curr_p['open']
-        is_uptrend, support_p, is_near_support = check_uptrend_and_support(sid, date, data)
-        is_dumping = check_broker_dumping(sid, date, data, micro_features)
-        
-        if is_red and is_near_support and not is_dumping:
-            dip_details = {'prev_gain': prev_gain, 'vol_ratio': curr_vol/prev_vol, 'is_red_candle': is_red}
-            dip_score = calculate_dip_score(dip_details)
-            return True, ('WASH_OUT_DIP', dip_score)
+    # A. WASH_OUT_DIP (抄底模式)
+    if switches.get('WASH_OUT_DIP', False):
+        is_wash_out_base = prev_gain < -0.03 and curr_vol < prev_vol * 0.8
+        if is_wash_out_base:
+            is_red = curr_p['close'] > curr_p['open']
+            is_uptrend, support_p, is_near_support = check_uptrend_and_support(sid, date, data)
+            is_dumping = check_broker_dumping(sid, date, data, micro_features)
+            if is_red and is_near_support and not is_dumping:
+                dip_score = 0
+                if PIPELINE_CONTROL.get('ENABLE_DIP_SCORE', True):
+                    dip_details = {'prev_gain': prev_gain, 'vol_ratio': curr_vol/prev_vol, 'is_red_candle': is_red}
+                    dip_score = calculate_dip_score(dip_details)
+                return True, ('WASH_OUT_DIP', dip_score)
 
-    # B. HOLY_GRAIL_BREAKOUT (聖盃模式) - 已關閉
-    # if is_bull_market:
-    #     ... (邏輯已註解)
+    # B. HOLY_GRAIL_BREAKOUT (聖盃模式)
+    if switches.get('HOLY_GRAIL_BREAKOUT', False) and is_bull_market:
+        is_vol_dry = curr_vol < (prev_vol * HOLY_GRAIL_PARAMS['VOL_DRY_RATIO'])
+        prev_report = stock_info.get('trading_daily_report', {}).get(prev_date, {})
+        curr_report = stock_info.get('trading_daily_report', {}).get(date, {})
+        prev_top_b = prev_report.get('top_buyers', [])
+        is_winner_locked = False
+        if prev_top_b:
+            winner_bid = str(prev_top_b[0].get('trader_id', '')).strip()
+            winner_selling = sum([abs(ts.get('net', 0)) for ts in curr_report.get('top_sellers', [])[:5] if winner_bid == str(ts.get('trader_id', ''))])
+            if winner_selling < (abs(prev_top_b[0].get('net', 0)) * HOLY_GRAIL_PARAMS['WINNER_LOCK_RATIO']):
+                is_winner_locked = True
+        if (prev_gain > HOLY_GRAIL_PARAMS['PREV_GAIN_THRESHOLD'] and is_vol_dry and is_winner_locked and
+            curr_p['close'] >= prev_p['close'] * HOLY_GRAIL_PARAMS['PRICE_SUPPORT_LEVEL']):
+            return True, ('HOLY_GRAIL_BREAKOUT', momentum_score)
+
+    # C. VOLATILITY (波動率模式)
+    if switches.get('VOLATILITY', False) and is_bull_market:
+        if momentum_score > 75 and curr_p['close'] > curr_p['open']:
+            return True, ('VOLATILITY', momentum_score)
+
+    # D. SCALPING (極短線模式)
+    if switches.get('SCALPING', False):
+        dt_sig = calculate_day_trading_signal(sid, date, data, micro_features)
+        if dt_sig['type'] == 'REVERSAL' and dt_sig['strength'] > 50:
+            return True, ('SCALPING', dt_sig['strength'])
 
     return False, None
 
