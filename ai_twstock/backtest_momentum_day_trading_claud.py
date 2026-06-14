@@ -110,7 +110,7 @@ STRATEGY_MODES = {
     'HOLY_GRAIL_BREAKOUT': {'STOP_LOSS': -0.05, 'TAKE_PROFIT': 9.99, 'BREAK_EVEN_TRIGGER': 0.06, 'HOLD_DAYS': 20, 'PARTIAL_EXIT_GAIN': 0.10, 'TRAILING_STOP_NORMAL': 0.08},
     'VOLATILITY': {'STOP_LOSS': -0.08, 'TAKE_PROFIT': 9.99, 'BREAK_EVEN_TRIGGER': 0.05, 'HOLD_DAYS': 10},
     'SCALPING': {'STOP_LOSS': -0.03, 'TAKE_PROFIT': 0.06, 'BREAK_EVEN_TRIGGER': 0.03, 'HOLD_DAYS': 1},
-    'WASH_OUT_DIP': {'STOP_LOSS': -0.03, 'TAKE_PROFIT': 0.05, 'HOLD_DAYS': 2},
+    'WASH_OUT_DIP': {'STOP_LOSS': -0.05, 'TAKE_PROFIT': 0.10, 'HOLD_DAYS': 5},
     'LOW_ENTRY': {'STOP_LOSS': -0.05, 'TAKE_PROFIT': 9.99, 'BREAK_EVEN_TRIGGER': 0.08, 'HOLD_DAYS': 40, 'MAX_MOMENTUM': 45}
 }
 BACKTEST_CONFIG = {'STARTING_CASH': 2000000, 'TOP_N': 8, 'MIN_TRADING_VALUE': 30000000}
@@ -187,13 +187,31 @@ def calculate_momentum_score(details, weights=DEFAULT_WEIGHTS):
 
 def calculate_dip_score(details):
     """
-    逆勢軌道評分系統 (與動能評分平行、量級獨立)
-    維度：跌幅深度、縮量程度、價格止跌強度
+    逆勢軌道評分系統 2.0
+    維度：跌幅深度、縮量程度、價格止跌強度、趨勢底氣、券商籌碼、動能交叉
     """
     score = 0
-    score += min(40, abs(details['prev_gain']) * 400)
-    score += max(0, (1 - details['vol_ratio']) * 30)
-    if details['is_red_candle']: score += 30
+    # 1. 跌幅深度 (權重 15)
+    score += min(15, abs(details['prev_gain']) * 150)
+    # 2. 縮量程度 (權重 15)
+    score += max(0, (1 - details['vol_ratio']) * 15)
+    # 3. 價格止跌強度 (權重 15)
+    if details['is_red_candle']: score += 15
+    
+    # 4. 【強勢回檔加分】趨勢底氣 (權重 20)
+    if details.get('is_above_ma60', False): score += 20
+    
+    # 5. 【券商籌碼加分】(權重 20)
+    # 邏輯：(穩重買入 - 炒作買入) 為正，代表炒作券商在賣、穩重券商在接
+    broker_net = details.get('broker_manipulation_net', 0)
+    if broker_net > 0:
+        score += min(20, broker_net * 2)
+        
+    # 6. 【動能交叉加分】(權重 15)
+    # 邏輯：MA5 轉折或黃金交叉
+    if details.get('is_golden_cross', False): score += 15
+    elif details.get('is_ma5_up', False): score += 7
+        
     return score
 
 
@@ -427,11 +445,11 @@ def decide_buy_dip(sid, date, data, micro_features):
     idx = date_to_idx[date]
     if idx < 60: return False, None  # 需要 60 日高點位階過濾
 
-    # 1. 【位階過濾】距離 60 日高點回檔 < 15% 拒絕進場
+    # 1. 【位階過濾】距離 60 日高點回檔 < 10% 拒絕進場 (放寬：15% -> 10%)
     lookback_60 = sorted_dates[idx-60:idx]
     max_p_60 = max(price_data[d]['max'] for d in lookback_60)
     curr_close = price_data[date]['close']
-    if curr_close > (max_p_60 * 0.85):
+    if curr_close > (max_p_60 * 0.90):
         return False, None
 
     prev_date   = sorted_dates[idx - 1]
@@ -454,7 +472,8 @@ def decide_buy_dip(sid, date, data, micro_features):
     curr_low = curr_p.get('min', curr_p['close'])
     lower_shadow = min(curr_p['open'], curr_p['close']) - curr_low
     is_red = curr_p['close'] > curr_p['open']
-    is_strong_reversal = is_red and lower_shadow >= (body * 1.2)
+    # 2. 【右側 K 線升級】紅K + 下影線 >= 實體 0.8 倍 (放寬：1.2 -> 0.8)
+    is_strong_reversal = is_red and lower_shadow >= (body * 0.8)
     
     if not is_strong_reversal:
         return False, None
@@ -823,12 +842,13 @@ def run_backtest():
             
             # 4. Drawdown Grids 階梯式解鎖逆勢上限
             m_dd = twse_dd_60.get(analysis_date, 0)
+            # 3. Drawdown Grids 階梯式解鎖逆勢上限 (放寬平時上限：1 -> 2)
             if m_dd >= -0.03:
-                max_dip_limit = 1
-            elif -0.07 <= m_dd < -0.03:
                 max_dip_limit = 2
+            elif -0.07 <= m_dd < -0.03:
+                max_dip_limit = 3
             else:
-                max_dip_limit = 4
+                max_dip_limit = 5
             
             # 最終逆勢上限取 (剩餘總額度) 與 (階梯解鎖額度) 的小值
             max_dip_slots = min(max_dip_limit, top_n - max_breakout_slots)
@@ -845,8 +865,8 @@ def run_backtest():
             n_breakout_avail = max(0, max_breakout_slots - curr_breakout_count)
             n_dip_avail = max(0, max_dip_slots - curr_dip_count)
             
-            # 5. 每日進場總量限制 (DAILY_DIP_LIMIT = 1)
-            DAILY_DIP_LIMIT = 1
+            # 5. 每日進場總量限制 (DAILY_DIP_LIMIT = 2)
+            DAILY_DIP_LIMIT = 2
             n_dip_to_buy = min(n_dip_avail, len(dip_candidates), DAILY_DIP_LIMIT, available_slots)
             n_breakout_to_buy = min(n_breakout_avail, len(breakout_candidates), available_slots - n_dip_to_buy)
             
