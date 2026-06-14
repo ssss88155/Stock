@@ -13,11 +13,14 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # 將 lib 目錄加入 Python 路徑
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lib'))
 from common_lib import load_independent_stock_data, get_script_dir, load_independent_stock_data_custom
+from data.holidays_config import HOLIDAYS_DATA, get_all_holidays
 
 # 全域控制變數
 shutdown_event = threading.Event()
 current_api_threads = 5 # 預設值，會被 args.threads 覆蓋，控制 API 併發
 api_threads_lock = threading.Lock()
+holiday_counter = {}
+holiday_lock = threading.Lock()
 
 def signal_handler(sig, frame):
     print("\n[INTERRUPT] 偵測到中斷訊號 (Ctrl+C)，正在安全結束並儲存已抓取資料...")
@@ -194,34 +197,36 @@ def process_micro_day(api, sid, d_str):
 
 def update_holidays_file(h_path, new_dates):
     if not new_dates: return
-    # 排除今天，避免因為資料還沒產出就誤把今天當成永久假日
     today_str = datetime.now().strftime('%Y-%m-%d')
     valid_new_dates = [d for d in new_dates if d != today_str]
     if not valid_new_dates: return
 
-    try:
-        with open(h_path, 'r', encoding='utf-8') as f:
-            h_dict = json.load(f)
-        
-        # 清理：如果 h_dict 中包含今天，將其移除 (修正之前的錯誤)
-        for year in list(h_dict.keys()):
-            if today_str in h_dict[year]:
-                h_dict[year].remove(today_str)
-                print(f"      -> 已從假日檔移除誤植的今日日期: {today_str}")
+    global holiday_counter
+    config_py_path = os.path.join(os.path.dirname(h_path), "holidays_config.py")
+    
+    with holiday_lock:
         changed = False
         for d in valid_new_dates:
-            year = d.split('-')[0]
-            if year not in h_dict: h_dict[year] = []
-            if d not in h_dict[year]:
-                h_dict[year].append(d)
-                h_dict[year].sort()
-                changed = True
+            holiday_counter[d] = holiday_counter.get(d, 0) + 1
+            if holiday_counter[d] >= 300:
+                year_key = f"HOLIDAY_{d.split('-')[0]}"
+                if year_key not in HOLIDAYS_DATA:
+                    HOLIDAYS_DATA[year_key] = []
+                if d not in HOLIDAYS_DATA[year_key]:
+                    HOLIDAYS_DATA[year_key].append(d)
+                    HOLIDAYS_DATA[year_key].sort()
+                    changed = True
+                holiday_counter.pop(d)
+
         if changed:
-            with open(h_path, 'w', encoding='utf-8') as f:
-                json.dump(h_dict, f, ensure_ascii=False, indent=4)
-            print(f"      -> 已更新假日檔，新增 {len(valid_new_dates)} 個無資料日期。")
-    except Exception as e:
-        print(f"      [Error] 更新假日檔失敗: {e}")
+            try:
+                content = "# 台灣股市國定假日定義\nHOLIDAYS_DATA = " + json.dumps(HOLIDAYS_DATA, indent=2) + "\n\n"
+                content += "def get_all_holidays():\n    all_dates = []\n    for year_list in HOLIDAYS_DATA.values():\n        all_dates.extend(year_list)\n    return sorted(list(set(all_dates)))\n"
+                with open(config_py_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                print(f"\n      -> [HOLIDAY] 已更新 holidays_config.py，新增假日資料。")
+            except Exception as e:
+                print(f"\n      [Error] 寫入 holidays_config.py 失敗: {e}")
 
 def process_phase_price(acc, sid, start_date, end_date, last_target_date):
     if shutdown_event.is_set(): return
@@ -238,11 +243,9 @@ def process_phase_price(acc, sid, start_date, end_date, last_target_date):
                 raw = json.load(f)
                 data = raw.get(sid, raw)
                 price_entries = data.get('price', {})
-                # 檢查檔案內是否已經包含最後一個目標交易日的資料
+                # 嚴格比對：目標日期是否已在檔案中
                 if last_target_date in price_entries:
-                    # 額外檢查法人與持股資料是否也存在 (避免只有價格)
                     inst_entries = data.get('institutional', {})
-                    hold_entries = data.get('shareholding', {})
                     if last_target_date in inst_entries:
                         return "SKIP"
         except: pass
@@ -351,30 +354,31 @@ def main():
     primary_api = apis[0] # 使用第一個 (也是唯一的) 高額度帳號
 
     # 讀取國定假日
-    holidays = []
     h_path = os.path.join(get_script_dir(__file__), "data", "holidays.json")
-    h_dict = {}
-    if os.path.exists(h_path):
-        try:
-            with open(h_path, 'r', encoding='utf-8') as f:
-                h_dict = json.load(f)
-                for year in h_dict: holidays.extend(h_dict[year])
-        except: pass
+    holidays = get_all_holidays()
 
     # 日期範圍與時間限制判斷
     now = datetime.now()
     today_str = now.strftime('%Y-%m-%d')
     
-    # Price 資料限制：14:00 以前只能拿昨天以前的資料
+    # 判斷是否為週末 (5=Saturday, 6=Sunday)
+    is_weekend = now.weekday() >= 5
+
+    # Price 資料限制：14:00 以前只能拿昨天以前的資料；週末則拿週五以前的資料
     # 注意：FinMind API 傳入 end_date=today 時，若資料未產出會回傳到昨天
     # 但我們的 Fast-Check 需要精確的目標日期
-    if now.hour < 14:
+    if is_weekend:
+        # 週末時，目標日期應為最後一個工作日 (週五)
+        price_end_date = (now - timedelta(days=now.weekday() - 4)).strftime('%Y-%m-%d')
+    elif now.hour < 14:
         price_end_date = (now - timedelta(days=1)).strftime('%Y-%m-%d')
     else:
         price_end_date = today_str
         
-    # Micro (券商) 資料限制：17:00 以前只能拿昨天以前的資料
-    if now.hour < 17:
+    # Micro (券商) 資料限制：17:00 以前只能拿昨天以前的資料；週末則拿週五以前的資料
+    if is_weekend:
+        micro_end_date = (now - timedelta(days=now.weekday() - 4)).strftime('%Y-%m-%d')
+    elif now.hour < 17:
         micro_end_date = (now - timedelta(days=1)).strftime('%Y-%m-%d')
     else:
         micro_end_date = today_str
@@ -382,7 +386,14 @@ def main():
     # 如果今天是假日，則 end_date 應該自動回溯到最後一個交易日
     # 這裡透過 pd.date_range 的 freq='B' 配合 holidays 過濾來達成
 
-    start_date_str = (now - timedelta(days=320)).strftime('%Y-%m-%d')
+    # 強制修正：如果 end_date 在假日檔中，必須回溯到前一個交易日，否則 Fast-Check 會失效
+    temp_price_dates = pd.date_range(end=price_end_date, periods=10, freq='B').strftime('%Y-%m-%d').tolist()
+    price_end_date = [d for d in temp_price_dates if d <= price_end_date and d not in holidays][-1]
+    
+    temp_micro_dates = pd.date_range(end=micro_end_date, periods=10, freq='B').strftime('%Y-%m-%d').tolist()
+    micro_end_date = [d for d in temp_micro_dates if d <= micro_end_date and d not in holidays][-1]
+
+    start_date_str = (now - timedelta(days=860)).strftime('%Y-%m-%d')
     
     # 修正：如果今天被誤植在假日檔中，先在記憶體中排除它，確保今天能被正確抓取
     if today_str in holidays:
@@ -401,14 +412,16 @@ def main():
     micro_target_dates = [d for d in micro_b_days if d not in holidays]
     if micro_target_dates:
         micro_end_date = micro_target_dates[-1]
+
+    # 最終同步 last_target_date 給 Phase 1 使用
+    last_price_date = price_target_dates[-1] if price_target_dates else ""
     
     stocks_path = os.path.join(get_script_dir(__file__), 'taiwan_stocks.csv')
     stocks = [args.stock_id] if args.stock_id else (pd.read_csv(stocks_path).iloc[:,0].astype(str).tolist() if os.path.exists(stocks_path) else ['2330'])
-    '''
+    
     # --- PHASE 1: PRICE DATA (Multi-threaded by Stock) ---
     print(f"\n>>> PHASE 1: Fetching Price/Institutional/Shareholding Data (Workers: {args.workers}, API Threads: {current_api_threads})")
     print(f"      Target End Date: {price_end_date}")
-    last_price_date = price_target_dates[-1] if price_target_dates else ""
     
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
         futures = {}
@@ -430,7 +443,7 @@ def main():
             except Exception as e:
                 print(f"\n      [Error] {sid}: {e}")
     print("\n      Phase 1 Completed.")
-    '''
+    
     # --- PHASE 2: MICRO DATA (Dynamic Multi-threaded) ---
     print(f"\n>>> PHASE 2: Fetching Micro Data (Workers: {args.workers}, API Threads: {current_api_threads}, Fast-Check Enabled)")
     print(f"      Target End Date: {micro_end_date}")
