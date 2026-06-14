@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 backtest_momentum_day_trading.py
-五模式精準版：HOLY_GRAIL, LOW_ENTRY, WASH_OUT_DIP, SCALPING, VOLATILITY
-目標：超越 0050 漲幅 (25%+)
+聖盃模式 4.0 終極精準版 (含大盤防禦開關)
+目標：在多頭環境下極大化獲利，超越 0050
 """
 
 import json
@@ -11,7 +11,7 @@ import os
 import sys
 import sqlite3
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import defaultdict
 
 # 嘗試設定輸出編碼
@@ -23,53 +23,44 @@ except Exception:
     pass
 
 # =================================================================
-# 策略參數與權重
+# 載入外部設定 (確保預設值為 2026 年最強版本)
 # =================================================================
+sys.path.append(os.path.join(os.path.dirname(__file__), 'backtest_micro_simulate', 'v1', 'config'))
+
+# 2026 年最強參數預設值
+HOLY_GRAIL_PARAMS = {
+    'PREV_GAIN_THRESHOLD': 0.05, 
+    'VOL_DRY_RATIO': 0.65, 
+    'WINNER_LOCK_RATIO': 0.15, 
+    'PRICE_SUPPORT_LEVEL': 0.97,
+    'USE_MARKET_FILTER': True
+}
+STRATEGY_MODES = {
+    'HOLY_GRAIL_BREAKOUT': {
+        'STOP_LOSS': -0.05, 
+        'TAKE_PROFIT': 9.99, 
+        'BREAK_EVEN_TRIGGER': 0.06, 
+        'HOLD_DAYS': 20
+    },
+    'VOLATILITY': {'STOP_LOSS': -0.08, 'TAKE_PROFIT': 9.99, 'BREAK_EVEN_TRIGGER': 0.05, 'HOLD_DAYS': 10},
+    'SCALPING': {'STOP_LOSS': -0.03, 'TAKE_PROFIT': 0.06, 'BREAK_EVEN_TRIGGER': 0.03, 'HOLD_DAYS': 1},
+    'WASH_OUT_DIP': {'STOP_LOSS': -0.03, 'TAKE_PROFIT': 0.05, 'HOLD_DAYS': 2},
+    'LOW_ENTRY': {'STOP_LOSS': -0.05, 'TAKE_PROFIT': 9.99, 'BREAK_EVEN_TRIGGER': 0.08, 'HOLD_DAYS': 40, 'MAX_MOMENTUM': 45}
+}
+BACKTEST_CONFIG = {'STARTING_CASH': 2000000, 'TOP_N': 8, 'MIN_TRADING_VALUE': 30000000}
+
+try:
+    from holy_grail_config import HOLY_GRAIL_PARAMS as HGP, STRATEGY_MODES as SM, BACKTEST_CONFIG as BC
+    HOLY_GRAIL_PARAMS.update(HGP)
+    STRATEGY_MODES.update(SM)
+    BACKTEST_CONFIG.update(BC)
+except ImportError:
+    pass
+
 DEFAULT_WEIGHTS = {
     'WEIGHT_GAIN': 40, 'WEIGHT_VOLUME': 10, 'WEIGHT_FOREIGN': 10,
     'WEIGHT_SITC': 10, 'WEIGHT_VCP': 10, 'WEIGHT_BREAKOUT': 10,
-    'WEIGHT_HANDOVER': 40, 'MIN_SCORE_TO_PRINT': 60, 'MIN_TRADING_VALUE': 30000000,
-}
-
-# 五模式設定
-STRATEGY_MODES = {
-    'HOLY_GRAIL_BREAKOUT': {
-        'STOP_LOSS': -0.04,
-        'TAKE_PROFIT': 0.15,
-        'BREAK_EVEN_TRIGGER': 0.06,
-        'HOLD_DAYS': 10
-    },
-    'VOLATILITY': {
-        'RISK_LIMIT': 0.60,
-        'MIN_CONCENTRATION': 0.01,
-        'STOP_LOSS': -0.08,
-        'TAKE_PROFIT': 9.99,
-        'BREAK_EVEN_TRIGGER': 0.05,
-        'HOLD_DAYS': 10
-    },
-    'SCALPING': {
-        'RISK_LIMIT': 1.0,
-        'MIN_CONCENTRATION': 0.05,
-        'STOP_LOSS': -0.03,
-        'TAKE_PROFIT': 0.06,
-        'BREAK_EVEN_TRIGGER': 0.03,
-        'MIN_RISK_RATIO': 0.40,
-        'HOLD_DAYS': 1
-    },
-    'LOW_ENTRY': {
-        'RISK_LIMIT': 0.30,
-        'MIN_CONCENTRATION': 0.03,
-        'STOP_LOSS': -0.05,
-        'TAKE_PROFIT': 9.99,
-        'BREAK_EVEN_TRIGGER': 0.08,
-        'MAX_MOMENTUM': 45,
-        'HOLD_DAYS': 40
-    },
-    'WASH_OUT_DIP': {
-        'STOP_LOSS': -0.03,
-        'TAKE_PROFIT': 0.05,
-        'HOLD_DAYS': 2
-    }
+    'WEIGHT_HANDOVER': 40, 'MIN_SCORE_TO_PRINT': 60, 'MIN_TRADING_VALUE': BACKTEST_CONFIG['MIN_TRADING_VALUE'],
 }
 
 MICRO_FEATURE_FILE = r"C:\jupyter_notebook\ai_twstock\data\micro_feature_all.json"
@@ -170,62 +161,68 @@ def calculate_day_trader_risk(sid, date, data, micro_features):
         if bid in micro_features and micro_features[bid].get('穩重指數', 0) < -50: dt_vol += qty
     return dt_vol / total_vol if total_vol > 0 else 0
 
-def check_first_breakout(sid, date, data):
-    stock_info = data.get(sid, {})
-    price_data = stock_info.get('price', {})
-    sorted_dates = sorted(price_data.keys())
-    if date not in sorted_dates: return False, 0
-    idx = sorted_dates.index(date)
-    if idx < 20: return False, 0
-    lookback = sorted_dates[idx-20:idx]
-    max_p_20 = max([price_data[d]['close'] for d in lookback])
-    avg_vol_20 = sum([price_data[d].get('Trading_Volume', 0) for d in lookback]) / 20
-    curr_p = price_data[date]['close']
-    curr_vol = price_data[date].get('Trading_Volume', 0)
-    open_p = price_data[date].get('open', 0)
-    gain = (curr_p - open_p) / open_p if open_p > 0 else 0
-    return curr_p > max_p_20 and curr_vol > (avg_vol_20 * 2.5) and gain > 0.04, gain
-
 def decide_buy(momentum_score, dt_signal, risk_ratio, is_winner_buying, pv_alignment, mode='VOLATILITY', sid=None, date=None, data=None):
-    concentration = pv_alignment['concentration'] if pv_alignment else 0
-    
+    """
+    聖盃模式 4.0：贏家鎖籌回測版 (含大盤防禦開關)
+    """
     if sid and date and data:
-        is_breakout, _ = check_first_breakout(sid, date, data)
-        report = data.get(sid, {}).get('trading_daily_report', {}).get(date, {})
-        top_b = report.get('top_buyers', [])
-        price_info = data[sid]['price'][date]
-        total_vol = price_info.get('Trading_Volume', 0)
-        
-        if is_breakout and top_b and total_vol > 0:
-            top_buy_qty = abs(top_b[0].get('net', 0))
-            # 買一強度：買一分點買超佔總成交量 10% 以上
-            if top_buy_qty / total_vol > 0.10:
-                return True, 'HOLY_GRAIL_BREAKOUT'
+        # 0. 大盤防禦開關
+        if HOLY_GRAIL_PARAMS.get('USE_MARKET_FILTER', False):
+            if '0050' in data:
+                p0050 = data['0050'].get('price', {})
+                sorted_dates = sorted(p0050.keys())
+                if date in sorted_dates:
+                    idx = sorted_dates.index(date)
+                    if idx >= 20:
+                        def get_ma(n, end_idx):
+                            return sum([p0050[sorted_dates[i]]['close'] for i in range(end_idx-n+1, end_idx+1)]) / n
+                        ma10, ma20 = get_ma(10, idx), get_ma(20, idx)
+                        # 強制要求大盤處於主升段 (10MA > 20MA 且 價格 > 10MA)
+                        if not (p0050[date]['close'] > ma10 > ma20):
+                            return False, None # 大盤非強勢多頭，強制空倉
 
-    if mode == 'WASH_OUT_DIP' and sid and date and data:
         stock_info = data.get(sid, {})
         price_data = stock_info.get('price', {})
         sorted_dates = sorted(price_data.keys())
-        if date in sorted_dates:
-            idx = sorted_dates.index(date)
-            if idx > 0:
-                prev_date = sorted_dates[idx-1]
-                prev_price = price_data[prev_date]
-                curr_price = price_data[date]
-                prev_gain = (prev_price['close'] - prev_price['open']) / prev_price['open'] if prev_price['open'] > 0 else 0
-                if prev_gain > 0.07 and curr_price['min'] <= prev_price['close'] * 1.01:
-                    return True, 'WASHOUT_DIP_BUY'
-        return False, None
+        if date not in sorted_dates: return False, None
+        idx = sorted_dates.index(date)
+        if idx < 1: return False, None
+        
+        prev_date = sorted_dates[idx-1]
+        curr_p = price_data[date]
+        prev_p = price_data[prev_date]
+        
+        # 1. 昨日特徵：大漲突破
+        prev_gain = (prev_p['close'] - prev_p['open']) / prev_p['open'] if prev_p['open'] > 0 else 0
+        
+        # 2. 今日特徵：縮量回測
+        curr_vol = curr_p.get('Trading_Volume', 0)
+        prev_vol = prev_p.get('Trading_Volume', 0)
+        is_vol_dry = curr_vol < (prev_vol * HOLY_GRAIL_PARAMS['VOL_DRY_RATIO'])
+        
+        # 3. 籌碼鎖定：昨日買一贏家今日沒跑
+        prev_report = stock_info.get('trading_daily_report', {}).get(prev_date, {})
+        curr_report = stock_info.get('trading_daily_report', {}).get(date, {})
+        prev_top_b = prev_report.get('top_buyers', [])
+        
+        is_winner_locked = False
+        if prev_top_b:
+            winner_bid = str(prev_top_b[0].get('trader', '')).split('/')[-1].strip()
+            curr_top_s = curr_report.get('top_sellers', [])
+            winner_selling = 0
+            for ts in curr_top_s[:5]:
+                if winner_bid in str(ts.get('trader', '')):
+                    winner_selling = abs(ts.get('net', 0))
+            
+            if winner_selling < (abs(prev_top_b[0].get('net', 0)) * HOLY_GRAIL_PARAMS['WINNER_LOCK_RATIO']):
+                is_winner_locked = True
 
-    if mode == 'LOW_ENTRY':
-        if momentum_score < STRATEGY_MODES['LOW_ENTRY']['MAX_MOMENTUM'] and is_winner_buying and concentration > 0.04:
-            return True, 'LOW_ENTRY_ACCUMULATION'
-        return False, None
+        # 4. 決策：昨日大漲 + 今日縮量 + 贏家鎖籌
+        if (prev_gain > HOLY_GRAIL_PARAMS['PREV_GAIN_THRESHOLD'] and 
+            is_vol_dry and is_winner_locked and 
+            curr_p['close'] >= prev_p['close'] * HOLY_GRAIL_PARAMS['PRICE_SUPPORT_LEVEL']):
+            return True, 'HOLY_GRAIL_BREAKOUT'
 
-    if concentration < 0.01: return False, None
-    if risk_ratio > 0.60: return False, None
-    if is_winner_buying and momentum_score > 50: return True, 'BULL_CHARGE'
-    if momentum_score >= 75: return True, 'MOMENTUM_FOLLOW'
     return False, None
 
 # =================================================================
@@ -268,7 +265,9 @@ def load_all_data(db_path, start_date):
 
 def run_backtest():
     start_date = "2026-03-01"
-    data = load_all_data(DB_PATH, "2026-01-01")
+    start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
+    data_date_str = (start_date_obj - timedelta(days=90)).strftime("%Y-%m-%d")
+    data = load_all_data(DB_PATH, data_date_str)
     if not data: return
     with open(MICRO_FEATURE_FILE, 'r', encoding='utf-8') as f:
         micro_features = {str(item['id']).strip(): item for item in json.load(f)}
@@ -277,7 +276,9 @@ def run_backtest():
     all_dates = sorted(list(set(d for sid in data for d in data[sid].get('price', {}))))
     start_idx = all_dates.index(next(d for d in all_dates if d >= start_date))
     
-    cash = 2000000; portfolio = {}; transactions = []; top_n = 10
+    cash = BACKTEST_CONFIG['STARTING_CASH']
+    portfolio = {}; transactions = []
+    top_n = BACKTEST_CONFIG['TOP_N']
     
     print(f"開始回測: {all_dates[start_idx]} -> {all_dates[-1]}")
     for idx in range(start_idx, len(all_dates)):
@@ -289,7 +290,7 @@ def run_backtest():
             gain = (curr_p - pos['avg_price']) / pos['avg_price']
             if 'max_gain' not in pos or gain > pos['max_gain']: pos['max_gain'] = gain
             
-            mode = pos['mode']; params = STRATEGY_MODES.get(mode, STRATEGY_MODES['VOLATILITY'])
+            mode = pos['mode']; params = STRATEGY_MODES.get(mode, STRATEGY_MODES['HOLY_GRAIL_BREAKOUT'])
             sell_reason = None; sell_ratio = 1.0
             
             if mode in ['VOLATILITY', 'LOW_ENTRY', 'HOLY_GRAIL_BREAKOUT'] and not pos.get('half_sold') and gain >= 0.10:
@@ -356,26 +357,9 @@ def run_backtest():
                 if top_b_list and str(top_b_list[0].get('trader','')).split('/')[-1] in micro_features:
                     if micro_features[str(top_b_list[0].get('trader','')).split('/')[-1]].get('穩重指數', 0) > 15: is_winner = True
                 
-                day_trader_hubs = ['美林', '凱基-台北', '富邦-建國', '元大-土城永寧', '群益金鼎-大安']
-                hub_count = 0
-                for tb in top_b_list[:3]:
-                    t_name = str(tb.get('trader', '')).split('/')[0].strip()
-                    if any(hub in t_name for hub in day_trader_hubs): hub_count += 1
-                
-                is_washout = False
-                if a_idx > 0:
-                    prev_risk = calculate_day_trader_risk(sid, sorted_d[a_idx-1], data, micro_features)
-                    if prev_risk > 0.45: is_washout = True
-                
-                if is_washout or hub_count >= 2: mode = 'WASH_OUT_DIP'
-                else: mode = 'SCALPING' if risk_ratio > 0.40 else 'VOLATILITY'
-                
-                buy, strat = decide_buy(score, dt_sig, risk_ratio, is_winner, pv_align, mode=mode, sid=sid, date=analysis_date, data=data)
+                buy, strat = decide_buy(score, dt_sig, risk_ratio, is_winner, pv_align, mode='HOLY_GRAIL_BREAKOUT', sid=sid, date=analysis_date, data=data)
                 if buy:
-                    # 聖盃訊號具備最高統計優先權
-                    final_mode = 'HOLY_GRAIL_BREAKOUT' if strat == 'HOLY_GRAIL_BREAKOUT' else mode
-                    # 修正：確保 strategy 被正確傳遞
-                    candidates.append({'sid': sid, 'score': score, 'mode': final_mode, 'price': p_data[current_date]['open'], 'strategy': strat or 'MOMENTUM'})
+                    candidates.append({'sid': sid, 'score': score, 'mode': 'HOLY_GRAIL_BREAKOUT', 'price': p_data[current_date]['open'], 'strategy': strat})
             
             candidates.sort(key=lambda x: x['score'], reverse=True)
             for cand in candidates[:top_n - len(portfolio)]:
@@ -398,7 +382,7 @@ def run_backtest():
         m_gains = [t['gain'] for t in m_sells]
         mode_stats[m] = {'count': len(m_sells), 'win_rate': len([g for g in m_gains if g > 0]) / len(m_gains) if m_gains else 0, 'avg_return': sum(m_gains) / len(m_gains) if m_gains else 0}
 
-    print(f"\n回測結束! 最終價值: {final_v:,.0f} (報酬率: {(final_v-2000000)/2000000:.1%})")
+    print(f"\n回測結束! 最終價值: {final_v:,.0f} (報酬率: {(final_v-BACKTEST_CONFIG['STARTING_CASH'])/BACKTEST_CONFIG['STARTING_CASH']:.1%})")
     print("\n" + "="*60)
     print(f"{'模式':<20} | {'交易次數':<8} | {'勝率':<8} | {'平均報酬':<10}")
     print("-" * 60)
@@ -409,8 +393,8 @@ def run_backtest():
     os.makedirs(RESULT_DIR, exist_ok=True)
     log_path = os.path.join(RESULT_DIR, "transaction_log.txt")
     with open(log_path, 'w', encoding='utf-8') as f:
-        f.write(f"=== 交易流水帳 (3月至今 - 五模式精準版) ===\n")
-        f.write(f"起始資金: 2,000,000 | 最終價值: {final_v:,.0f}\n")
+        f.write(f"=== 交易流水帳 (聖盃模式 4.0 終極精準版) ===\n")
+        f.write(f"起始資金: {BACKTEST_CONFIG['STARTING_CASH']:,} | 最終價值: {final_v:,.0f}\n")
         f.write("-" * 80 + "\n")
         for t in transactions:
             gain_str = f"{t.get('gain', 0):.1%}" if t['action'] == 'SELL' else "-"
