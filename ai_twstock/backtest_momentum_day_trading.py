@@ -46,7 +46,8 @@ STRATEGY_MODES = {
     'HOLY_GRAIL_BREAKOUT': {'STOP_LOSS': -0.05, 'TAKE_PROFIT': 9.99, 'BREAK_EVEN_TRIGGER': 0.06, 'HOLD_DAYS': 20, 'PARTIAL_EXIT_GAIN': 0.10, 'TRAILING_STOP_NORMAL': 0.08},
     'VOLATILITY': {'STOP_LOSS': -0.08, 'TAKE_PROFIT': 9.99, 'BREAK_EVEN_TRIGGER': 0.05, 'HOLD_DAYS': 10},
     'SCALPING': {'STOP_LOSS': -0.03, 'TAKE_PROFIT': 0.06, 'BREAK_EVEN_TRIGGER': 0.03, 'HOLD_DAYS': 1},
-    'WASH_OUT_DIP': {'STOP_LOSS': -0.03, 'TAKE_PROFIT': 0.05, 'HOLD_DAYS': 2}
+    'WASH_OUT_DIP': {'STOP_LOSS': -0.03, 'TAKE_PROFIT': 0.05, 'HOLD_DAYS': 2},
+    'LOW_ENTRY': {'STOP_LOSS': -0.05, 'TAKE_PROFIT': 9.99, 'BREAK_EVEN_TRIGGER': 0.08, 'HOLD_DAYS': 40, 'MAX_MOMENTUM': 45}
 }
 BACKTEST_CONFIG = {'STARTING_CASH': 2000000, 'TOP_N': 8, 'MIN_TRADING_VALUE': 30000000}
 
@@ -166,16 +167,14 @@ def decide_buy(momentum_score, dt_signal, risk_ratio, is_winner_buying, pv_align
                         def get_ma_0050(n, end_idx): return sum([p0050[sorted_0050[i]]['close'] for i in range(end_idx-n+1, end_idx+1)]) / n
                         ma20 = get_ma_0050(20, idx_0050)
                         ma60 = get_ma_0050(60, idx_0050)
-                        
-                        # 大多頭驅動條件：價格 > MA20 且 MA20 > MA60 (多頭排列)
-                        is_bull_market = p0050[date]['close'] > ma20 and ma20 > ma60
-                        
-                        if not is_bull_market:
-                            return False, None
+                        # 大多頭驅動：價格 > MA20 且 MA20 > MA60
+                        if p0050[date]['close'] > ma20 and ma20 > ma60: pass
+                        else: return False, None
         
         stock_info = data.get(sid, {})
         price_data = stock_info.get('price', {})
         sorted_dates = sorted(price_data.keys())
+        if date not in sorted_dates: return False, None
         idx = sorted_dates.index(date)
         if idx < 1: return False, None
         prev_date = sorted_dates[idx-1]
@@ -214,12 +213,23 @@ def load_stock_info():
     return names, industries
 
 def load_all_data(db_path, start_date):
-    cache_file = os.path.join(CACHE_DIR, f"data_cache_{start_date}.pkl")
+    # 優先尋找最接近且包含 start_date 的快取檔案
+    cache_files = [f for f in os.listdir(CACHE_DIR) if f.startswith("data_cache_") and f.endswith(".pkl")]
+    best_cache = None
+    if cache_files:
+        valid_caches = []
+        for f in cache_files:
+            try:
+                c_date = f.replace("data_cache_", "").replace(".pkl", "")
+                if c_date <= start_date: valid_caches.append((c_date, f))
+            except: continue
+        if valid_caches: best_cache = max(valid_caches, key=lambda x: x[0])[1]
+
+    cache_file = os.path.join(CACHE_DIR, best_cache if best_cache else f"data_cache_{start_date}.pkl")
     if os.path.exists(cache_file):
         print(f"正在從快取載入資料: {cache_file}...")
         t_start = time.time()
-        with open(cache_file, 'rb') as f:
-            data = pickle.load(f)
+        with open(cache_file, 'rb') as f: data = pickle.load(f)
         print(f"[DEBUG] 快取載入完成，耗時 {time.time()-t_start:.2f}s, RAM: {get_ram_usage():.1f} MB")
         return data
 
@@ -248,7 +258,7 @@ def load_all_data(db_path, start_date):
     return data
 
 def run_backtest():
-    start_date = "2026-03-01"
+    start_date = "2025-10-01"
     start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
     data_date_str = (start_date_obj - timedelta(days=90)).strftime("%Y-%m-%d")
     data = load_all_data(DB_PATH, data_date_str)
@@ -352,7 +362,6 @@ def run_backtest():
         for t in transactions:
             gain_str = f"{t.get('gain', 0):.1%}" if t['action'] == 'SELL' else "-"
             f.write(f"{t['date']:<12} | {t['sid']:<6} | {t['action']:<4} | {t.get('price', 0):<8.2f} | {gain_str:<8} | {t.get('reason', ''):<20}\n")
-    print(f"交易流水帳已匯出至: {log_path}")
 
 if __name__ == "__main__":
     run_backtest()
