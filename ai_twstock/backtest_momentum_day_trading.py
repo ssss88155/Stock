@@ -108,6 +108,20 @@ def calculate_momentum_score(details, weights=DEFAULT_WEIGHTS):
     score += (details['handover_score'] if details['handover_ok'] else 0) * weights['WEIGHT_HANDOVER'] / 100
     return score
 
+def calculate_dip_score(details):
+    """
+    抄底專用評分系統 (與動能評分平行)
+    維度：跌幅深度、縮量程度、價格止跌強度
+    """
+    score = 0
+    # 1. 跌幅貢獻 (跌越多分越高，上限 40)
+    score += min(40, abs(details['prev_gain']) * 400)
+    # 2. 縮量貢獻 (量縮越厲害分越高，上限 30)
+    score += max(0, (1 - details['vol_ratio']) * 30)
+    # 3. 止跌強度 (今日收紅棒加分)
+    if details['is_red_candle']: score += 30
+    return score
+
 def calculate_day_trading_signal(sid, date, data, micro_features):
     stock_info = data.get(sid, {})
     report = stock_info.get('trading_daily_report', {}).get(date, {})
@@ -158,8 +172,6 @@ def calculate_day_trader_risk(sid, date, data, micro_features):
 def check_uptrend_and_support(sid, date, data):
     """
     確認個股是否處於上行趨勢，並找出最近的支撐點
-    1. 價格 > MA20 (短期趨勢向上)
-    2. 找出過去 20 天的最低價作為支撐點
     """
     stock_info = data.get(sid, {})
     price_data = stock_info.get('price', {})
@@ -176,9 +188,12 @@ def check_uptrend_and_support(sid, date, data):
     # 支撐點：過去 20 天的最低收盤價
     support_p = min(prices_20)
     
-    # 上行趨勢定義：價格在 MA20 之上
+    # 判定是否在支撐區 (價格距離 20日最低點 7% 以內)
+    is_near_support = curr_p <= support_p * 1.07
+    
+    # 上行趨勢定義：價格在 MA20 之上 (聖盃用)
     is_uptrend = curr_p > ma20
-    return is_uptrend, support_p
+    return is_uptrend, support_p, is_near_support
 
 def check_broker_dumping(sid, date, data, micro_features):
     """
@@ -205,7 +220,7 @@ def check_broker_dumping(sid, date, data, micro_features):
 def decide_buy(momentum_score, dt_signal, risk_ratio, is_winner_buying, pv_alignment, mode='VOLATILITY', sid=None, date=None, data=None, micro_features=None):
     if not (sid and date and data): return False, None
     
-    # 1. 大盤環境判定 (Regime Detection)
+    # 1. 大盤環境判定
     is_bull_market = True
     if HOLY_GRAIL_PARAMS.get('USE_MARKET_FILTER', False) and '0050' in data:
         p0050 = data['0050'].get('price', {})
@@ -216,16 +231,15 @@ def decide_buy(momentum_score, dt_signal, risk_ratio, is_winner_buying, pv_align
                 def get_ma_0050(n, end_idx): return sum([p0050[sorted_0050[i]]['close'] for i in range(end_idx-n+1, end_idx+1)]) / n
                 ma20 = get_ma_0050(20, idx_0050)
                 ma60 = get_ma_0050(60, idx_0050)
-                # 大多頭定義：價格 > MA20 且 MA20 > MA60
                 is_bull_market = p0050[date]['close'] > ma20 and ma20 > ma60
 
-    # 2. 取得個股量價與籌碼資料
+    # 2. 取得個股量價
     stock_info = data.get(sid, {})
     price_data = stock_info.get('price', {})
     sorted_dates = sorted(price_data.keys())
     if date not in sorted_dates: return False, None
     idx = sorted_dates.index(date)
-    if idx < 1: return False, None
+    if idx < 20: return False, None
     
     prev_date = sorted_dates[idx-1]
     curr_p, prev_p = price_data[date], price_data[prev_date]
@@ -235,38 +249,35 @@ def decide_buy(momentum_score, dt_signal, risk_ratio, is_winner_buying, pv_align
     
     # 3. 模式判定邏輯
     
-    # A. WASH_OUT_DIP (洗盤抄底模式) - 優先判定，具備大盤豁免權
-    # 邏輯：昨日大跌(洗盤) + 今日縮量止跌 + 籌碼未散
-    is_wash_out = prev_gain < -0.03 and curr_vol < prev_vol * 0.7 and curr_p['close'] >= prev_p['close'] * 0.98
-    
-    if is_wash_out:
-        # 額外檢查：是否在上行趨勢中 (回檔而非轉空)
-        is_uptrend, support_p = check_uptrend_and_support(sid, date, data)
-        # 額外檢查：是否有短線券商倒貨
+    # A. WASH_OUT_DIP (抄底模式) - 獨立評分流
+    is_wash_out_base = prev_gain < -0.03 and curr_vol < prev_vol * 0.8
+    if is_wash_out_base:
+        # 抄底條件：1.收紅棒(止跌) 2.接近支撐 3.券商沒倒貨
+        is_red = curr_p['close'] > curr_p['open']
+        is_uptrend, support_p, is_near_support = check_uptrend_and_support(sid, date, data)
         is_dumping = check_broker_dumping(sid, date, data, micro_features)
         
-        if is_uptrend and not is_dumping:
-            return True, 'WASH_OUT_DIP'
+        if is_red and is_near_support and not is_dumping:
+            dip_details = {'prev_gain': prev_gain, 'vol_ratio': curr_vol/prev_vol, 'is_red_candle': is_red}
+            dip_score = calculate_dip_score(dip_details)
+            return True, ('WASH_OUT_DIP', dip_score)
 
-    # B. 需在大多頭環境下才啟動的模式
-    if not is_bull_market:
-        return False, None
-
-    # HOLY_GRAIL_BREAKOUT (聖盃突破模式)
-    is_vol_dry = curr_vol < (prev_vol * HOLY_GRAIL_PARAMS['VOL_DRY_RATIO'])
-    prev_report = stock_info.get('trading_daily_report', {}).get(prev_date, {})
-    curr_report = stock_info.get('trading_daily_report', {}).get(date, {})
-    prev_top_b = prev_report.get('top_buyers', [])
-    is_winner_locked = False
-    if prev_top_b:
-        winner_bid = str(prev_top_b[0].get('trader_id', '')).strip()
-        winner_selling = sum([abs(ts.get('net', 0)) for ts in curr_report.get('top_sellers', [])[:5] if winner_bid == str(ts.get('trader_id', ''))])
-        if winner_selling < (abs(prev_top_b[0].get('net', 0)) * HOLY_GRAIL_PARAMS['WINNER_LOCK_RATIO']):
-            is_winner_locked = True
-            
-    if (prev_gain > HOLY_GRAIL_PARAMS['PREV_GAIN_THRESHOLD'] and is_vol_dry and is_winner_locked and
-        curr_p['close'] >= prev_p['close'] * HOLY_GRAIL_PARAMS['PRICE_SUPPORT_LEVEL']):
-        return True, 'HOLY_GRAIL_BREAKOUT'
+    # B. HOLY_GRAIL_BREAKOUT (聖盃模式) - 需大多頭
+    if is_bull_market:
+        is_vol_dry = curr_vol < (prev_vol * HOLY_GRAIL_PARAMS['VOL_DRY_RATIO'])
+        prev_report = stock_info.get('trading_daily_report', {}).get(prev_date, {})
+        curr_report = stock_info.get('trading_daily_report', {}).get(date, {})
+        prev_top_b = prev_report.get('top_buyers', [])
+        is_winner_locked = False
+        if prev_top_b:
+            winner_bid = str(prev_top_b[0].get('trader_id', '')).strip()
+            winner_selling = sum([abs(ts.get('net', 0)) for ts in curr_report.get('top_sellers', [])[:5] if winner_bid == str(ts.get('trader_id', ''))])
+            if winner_selling < (abs(prev_top_b[0].get('net', 0)) * HOLY_GRAIL_PARAMS['WINNER_LOCK_RATIO']):
+                is_winner_locked = True
+        
+        if (prev_gain > HOLY_GRAIL_PARAMS['PREV_GAIN_THRESHOLD'] and is_vol_dry and is_winner_locked and
+            curr_p['close'] >= prev_p['close'] * HOLY_GRAIL_PARAMS['PRICE_SUPPORT_LEVEL']):
+            return True, ('HOLY_GRAIL_BREAKOUT', momentum_score)
 
     return False, None
 
@@ -408,9 +419,11 @@ def run_backtest():
                     bid = str(top_b_list[0].get('trader_id','')).strip()
                     if bid in micro_features and micro_features[bid].get('穩重指數', 0) > 15: is_winner = True
                 
-                # 執行買入判定
-                buy, strat = decide_buy(score, dt_sig, risk_ratio, is_winner, pv_align, mode='HOLY_GRAIL_BREAKOUT', sid=sid, date=analysis_date, data=data, micro_features=micro_features)
-                if buy: candidates.append({'sid': sid, 'score': score, 'mode': strat, 'price': p_data[current_date]['open'], 'strategy': strat})
+                # 執行買入判定 (回傳格式改為 (True, (模式, 分數)))
+                buy, res = decide_buy(score, dt_sig, risk_ratio, is_winner, pv_align, mode='HOLY_GRAIL_BREAKOUT', sid=sid, date=analysis_date, data=data, micro_features=micro_features)
+                if buy:
+                    strat, final_score = res
+                    candidates.append({'sid': sid, 'score': final_score, 'mode': strat, 'price': p_data[current_date]['open'], 'strategy': strat})
             candidates.sort(key=lambda x: x['score'], reverse=True)
             for cand in candidates[:top_n - len(portfolio)]:
                 buy_price = cand['price']
