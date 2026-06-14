@@ -549,6 +549,97 @@ def get_last_available_price(sid, data, all_dates):
     return 0
 
 
+def update_market_grids_cache(all_dates):
+    """
+    整合計算邏輯：計算 Market Breadth 與 0050 Drawdown 並更新快取檔案
+    """
+    print("正在從 SQL 載入資料進行大盤指標計算...")
+    import sqlite3
+    import pprint
+    conn = sqlite3.connect(DB_PATH)
+    
+    # 1. 載入 0050 資料計算 Drawdown
+    query_0050 = "SELECT date, close, high FROM daily_prices WHERE stock_id = '0050' ORDER BY date"
+    df_0050 = pd.read_sql(query_0050, conn)
+    
+    twse_dd_60 = {}
+    if not df_0050.empty:
+        df_0050['peak_60'] = df_0050['high'].rolling(window=60, min_periods=1).max()
+        df_0050['dd_60'] = (df_0050['close'] - df_0050['peak_60']) / df_0050['peak_60']
+        twse_dd_60 = df_0050.set_index('date')['dd_60'].to_dict()
+
+    # 2. 載入全市場資料計算 Market Breadth
+    query_all = "SELECT date, stock_id, close FROM daily_prices WHERE date >= '2025-01-01' ORDER BY date"
+    df_all = pd.read_sql(query_all, conn)
+    conn.close()
+
+    print("正在計算全市場 MA60 與 Market Breadth...")
+    df_pivot = df_all.pivot(index='date', columns='stock_id', values='close')
+    df_ma60 = df_pivot.rolling(window=60).mean()
+    df_above = (df_pivot > df_ma60).astype(float)
+    
+    if '0050' in df_above.columns:
+        df_above = df_above.drop(columns=['0050'])
+    
+    market_breadth = df_above.mean(axis=1, skipna=True).dropna().to_dict()
+
+    # 3. 封裝資料
+    grids_data = {
+        'market_breadth': market_breadth,
+        'twse_dd_60': twse_dd_60,
+        'last_update': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        'description': {
+            'market_breadth': '全市場(不含0050)收盤價站上 60日均線(MA60) 的家數比例。',
+            'twse_dd_60': '0050 距離過去 60 個交易日最高價(High)的回檔幅度。'
+        }
+    }
+
+    # 4. 寫入檔案 (具備縮排與註解)
+    print(f"正在更新快取檔案: {GRIDS_CACHE_FILE}...")
+    with open(GRIDS_CACHE_FILE, 'w', encoding='utf-8') as f:
+        f.write("# -*- coding: utf-8 -*-\n")
+        f.write("\"\"\"\n各項數值意義：\n")
+        f.write("1. market_breadth: 市場寬度。代表全市場有多少比例的股票站上季線(MA60)。\n")
+        f.write("2. twse_dd_60: 0050 波段回檔深度。\n\"\"\"\n\n")
+        f.write("GRIDS_DATA = ")
+        f.write(pprint.pformat(grids_data, indent=4, width=120, sort_dicts=True))
+        f.write("\n")
+    
+    return market_breadth, twse_dd_60
+
+
+def preprocess_market_indicators(data, all_dates):
+    """
+    預處理 Market Breadth 與 0050 Drawdown
+    自動判斷是否需要更新快取
+    """
+    market_breadth = {}
+    twse_dd_60 = {}
+    
+    # 1. 嘗試載入現有快取
+    if os.path.exists(GRIDS_CACHE_FILE):
+        try:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("grids_cache", GRIDS_CACHE_FILE)
+            grids_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(grids_module)
+            grids_data = getattr(grids_module, 'GRIDS_DATA', {})
+            market_breadth = grids_data.get('market_breadth', {})
+            twse_dd_60 = grids_data.get('twse_dd_60', {})
+        except Exception as e:
+            print(f"[WARN] 載入快取失敗，將重新計算: {e}")
+
+    # 2. 檢查日期是否完整 (檢查最後一天即可)
+    last_date = all_dates[-1]
+    if last_date not in market_breadth or last_date not in twse_dd_60:
+        print(f"快取資料不完整 (缺失日期: {last_date})，觸發自動更新...")
+        market_breadth, twse_dd_60 = update_market_grids_cache(all_dates)
+    else:
+        print(f"成功載入大盤指標快取 (最後更新日期: {last_date})")
+
+    return market_breadth, twse_dd_60
+
+
 # =================================================================
 # 資料載入
 # =================================================================
@@ -637,79 +728,9 @@ def run_backtest():
             data[sid]['date_to_idx']  = {d: i for i, d in enumerate(s_dates)}
 
     # ----------------------------------------------------------------
-    # [NEW] 預處理 Market Breadth (全市場站上 MA60 比例) 與 0050 Drawdown
+    # [NEW] 預處理 Market Breadth 與 0050 Drawdown
     # ----------------------------------------------------------------
-    print("正在載入/預處理 Market Breadth (MA60) 與 0050 Drawdown...")
-    market_breadth = {}
-    twse_dd_60 = {}
-    
-    # 嘗試從快取載入
-    grids_data = {'market_breadth': {}, 'twse_dd_60': {}, 'last_update': ''}
-    if os.path.exists(GRIDS_CACHE_FILE):
-        try:
-            import importlib.util
-            spec = importlib.util.spec_from_file_location("grids_cache", GRIDS_CACHE_FILE)
-            grids_module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(grids_module)
-            grids_data = getattr(grids_module, 'GRIDS_DATA', grids_data)
-            market_breadth = grids_data.get('market_breadth', {})
-            twse_dd_60 = grids_data.get('twse_dd_60', {})
-        except Exception as e:
-            print(f"[WARN] 載入 Grids 快取失敗: {e}")
-
-    # 找出需要更新的日期
-    missing_dates = [d for d in all_dates if d not in market_breadth or d not in twse_dd_60]
-    
-    if missing_dates:
-        print(f"發現 {len(missing_dates)} 天資料缺失，開始增量計算...")
-        # 預算所有股票的 MA60 (僅針對缺失日期相關的區間)
-        stock_ma60 = {}
-        for sid in data:
-            p_data = data[sid]['price']
-            s_dates = data[sid]['sorted_dates']
-            ma60_dict = {}
-            if len(s_dates) >= 60:
-                sum_60 = sum(p_data[d]['close'] for d in s_dates[:60])
-                ma60_dict[s_dates[59]] = sum_60 / 60
-                for i in range(60, len(s_dates)):
-                    sum_60 = sum_60 + p_data[s_dates[i]]['close'] - p_data[s_dates[i-60]]['close']
-                    ma60_dict[s_dates[i]] = sum_60 / 60
-            stock_ma60[sid] = ma60_dict
-
-        for d in missing_dates:
-            # Market Breadth
-            above_count = 0
-            total_count = 0
-            for sid in data:
-                if sid == '0050': continue
-                if d in stock_ma60[sid] and d in data[sid]['price']:
-                    total_count += 1
-                    if data[sid]['price'][d]['close'] > stock_ma60[sid][d]:
-                        above_count += 1
-            market_breadth[d] = above_count / total_count if total_count > 0 else 0.5
-            
-            # 0050 Drawdown (過去 60 日高點回檔)
-            if '0050' in data and d in data['0050']['date_to_idx']:
-                idx_0050 = data['0050']['date_to_idx'][d]
-                s_dates_0050 = data['0050']['sorted_dates']
-                lookback_60 = s_dates_0050[max(0, idx_0050-59):idx_0050+1]
-                peak_60 = max(data['0050']['price'][ld]['close'] for ld in lookback_60)
-                curr_0050 = data['0050']['price'][d]['close']
-                twse_dd_60[d] = (curr_0050 - peak_60) / peak_60 if peak_60 > 0 else 0
-            else:
-                twse_dd_60[d] = 0
-        
-        # 寫回快取
-        grids_data['market_breadth'] = market_breadth
-        grids_data['twse_dd_60'] = twse_dd_60
-        grids_data['last_update'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        try:
-            with open(GRIDS_CACHE_FILE, 'w', encoding='utf-8') as f:
-                f.write("# -*- coding: utf-8 -*-\n")
-                f.write("GRIDS_DATA = " + repr(grids_data) + "\n")
-            print(f"已更新 Grids 快取至 {GRIDS_CACHE_FILE}")
-        except Exception as e:
-            print(f"[WARN] 寫入 Grids 快取失敗: {e}")
+    market_breadth, twse_dd_60 = preprocess_market_indicators(data, all_dates)
 
     print(f"開始回測: {all_dates[start_idx]} -> {all_dates[-1]}")
     print(f"軌道設定: BREAKOUT_TRACK={PIPELINE_CONTROL['TRACK_SWITCH'].get('BREAKOUT_TRACK')} "
