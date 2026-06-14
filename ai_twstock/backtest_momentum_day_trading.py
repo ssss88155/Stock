@@ -188,11 +188,6 @@ def decide_buy(momentum_score, dt_signal, risk_ratio, is_winner_buying, pv_align
         if prev_top_b:
             winner_bid = str(prev_top_b[0].get('trader_id', '')).strip()
             winner_selling = sum([abs(ts.get('net', 0)) for ts in curr_report.get('top_sellers', [])[:5] if winner_bid == str(ts.get('trader_id', ''))])
-            
-            # DEBUG PRINT: 檢查贏家鎖籌判定
-            if sid == '2330' or (prev_gain > 0.05 and is_vol_dry):
-                print(f"[DEBUG][{date}][{sid}] Winner: {winner_bid}, PrevNet: {prev_top_b[0].get('net', 0)}, CurrSell: {winner_selling}")
-            
             if winner_selling < (abs(prev_top_b[0].get('net', 0)) * HOLY_GRAIL_PARAMS['WINNER_LOCK_RATIO']): is_winner_locked = True
         if (prev_gain > HOLY_GRAIL_PARAMS['PREV_GAIN_THRESHOLD'] and is_vol_dry and is_winner_locked and curr_p['close'] >= prev_p['close'] * HOLY_GRAIL_PARAMS['PRICE_SUPPORT_LEVEL']):
             return True, 'HOLY_GRAIL_BREAKOUT'
