@@ -394,6 +394,7 @@ def run_backtest():
             candidates = []
             for sid, details in data.items():
                 if sid in portfolio or analysis_date not in details['price'] or current_date not in details['price']: continue
+                if stock_industries.get(sid) not in top_sector_names: continue
                 
                 p_data = details['price']; sorted_d = sorted(p_data.keys()); a_idx = sorted_d.index(analysis_date)
                 start_p = p_data[sorted_d[a_idx-20]]['close']
@@ -409,14 +410,7 @@ def run_backtest():
                 
                 # 執行買入判定
                 buy, strat = decide_buy(score, dt_sig, risk_ratio, is_winner, pv_align, mode='HOLY_GRAIL_BREAKOUT', sid=sid, date=analysis_date, data=data, micro_features=micro_features)
-                
-                if buy:
-                    # 如果是聖盃模式，需額外檢查產業過濾
-                    if strat == 'HOLY_GRAIL_BREAKOUT':
-                        if stock_industries.get(sid) not in top_sector_names:
-                            continue
-                    
-                    candidates.append({'sid': sid, 'score': score, 'mode': strat, 'price': p_data[current_date]['open'], 'strategy': strat})
+                if buy: candidates.append({'sid': sid, 'score': score, 'mode': strat, 'price': p_data[current_date]['open'], 'strategy': strat})
             candidates.sort(key=lambda x: x['score'], reverse=True)
             for cand in candidates[:top_n - len(portfolio)]:
                 buy_price = cand['price']
