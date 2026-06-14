@@ -2,6 +2,7 @@ import json
 import os
 import unicodedata
 import time
+import ijson
 
 # --- 終端機顏色 ---
 class Color:
