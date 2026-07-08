@@ -14,6 +14,7 @@ MA_DATA_DIR = r'C:\jupyter_notebook\ai_twstock\data\MA_data'
 # 終端機顏色
 class Color:
     RED = '\033[91m'
+    ORANGE = '\033[38;5;208m'
     END = '\033[0m'
 
 def get_ma_file_path(stock_id):
@@ -123,10 +124,42 @@ def main():
         diff_pct = (close_val - ma_val) / ma_val * 100
         
         diff_str = f"{diff_pct:.2f}%"
-        if abs(diff_pct) >= 10:
+        abs_diff = abs(diff_pct)
+        if abs_diff >= 15:
             diff_str = f"{Color.RED}{diff_str}{Color.END}"
+        elif abs_diff >= 10:
+            diff_str = f"{Color.ORANGE}{diff_str}{Color.END}"
 
         print(f"{date:<12}\t{ma_val:<8.2f}\t{close_val:<8.2f}\t{diff_str}")
+
+    # 5. 預測未來 (假設限價持平)
+    print("\n預測未來 (假設限價持平於最新價格)")
+    print("-" * 50)
+    
+    # 獲取所有歷史收盤價
+    conn = sqlite3.connect(DB_PATH)
+    query = f"SELECT close FROM daily_prices WHERE stock_id = '{stock_id}' ORDER BY date ASC"
+    all_closes = pd.read_sql_query(query, conn)['close'].tolist()
+    conn.close()
+    
+    last_price = all_closes[-1]
+    periods = [10, 20, 30]
+    
+    for p in periods:
+        # 模擬未來 p 天價格持平
+        future_prices = all_closes + [last_price] * p
+        # 計算新的 MA
+        ma_future = pd.Series(future_prices).rolling(window=args.ma).mean().iloc[-1]
+        diff_pct = (last_price - ma_future) / ma_future * 100
+        
+        diff_str = f"{diff_pct:.2f}%"
+        abs_diff = abs(diff_pct)
+        if abs_diff >= 15:
+            diff_str = f"{Color.RED}{diff_str}{Color.END}"
+        elif abs_diff >= 10:
+            diff_str = f"{Color.ORANGE}{diff_str}{Color.END}"
+            
+        print(f"第 {p:<2} 天後 | 預估 {ma_key}: {ma_future:<8.2f} | 限價: {last_price:<8.2f} | 幅度: {diff_str}")
 
 if __name__ == "__main__":
     main()
