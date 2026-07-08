@@ -82,55 +82,71 @@ def main():
     parser.add_argument('--end', type=str, nargs='?', help='End date YYYY-MM-DD (optional, default is latest)')
     parser.add_argument('stock_id', type=str, help='Stock ID (e.g. 0050)')
     parser.add_argument('--ma', type=int, choices=[5, 20, 60], default=60, help='MA period to compare')
+    parser.add_argument('--compare', type=str, help='Compare with another stock ID (e.g. 0050)')
 
     args = parser.parse_args()
     stock_id = args.stock_id
+    comp_id = args.compare
     start_date = args.start
     ma_key = f'MA{args.ma}'
 
-    # 1. & 2. 檢查快取或產生
+    # 1. 載入主股票資料
     ma_data = load_ma_data_from_file(stock_id)
-    
-    if not ma_data:
-        ma_data = calculate_ma(stock_id)
-
+    if not ma_data: ma_data = calculate_ma(stock_id)
     if not ma_data:
         print(f"找不到股票 {stock_id} 的資料")
         return
 
-    # 處理 end date
+    # 2. 載入比較股票資料 (如果有)
+    comp_data = None
+    if comp_id:
+        comp_data = load_ma_data_from_file(comp_id)
+        if not comp_data: comp_data = calculate_ma(comp_id)
+
+    # 處理日期範圍
     all_dates = sorted(ma_data.keys())
     latest_date = all_dates[-1]
     end_date = args.end if args.end else latest_date
-
-    # 再次檢查日期範圍是否在快取中，若不在則重新計算 (可能快取太舊)
-    if start_date < all_dates[0] or end_date > latest_date:
-        ma_data = calculate_ma(stock_id)
-        all_dates = sorted(ma_data.keys())
-
-    print(f"編號 {stock_id} ( {start_date} ~ {end_date} )")
-    print("=" * 50)
-    print(f"{'Date':<12}\t{ma_key:<8}\t{'限價':<8}\t{'幅度':<8}")
-    print("-" * 50)
-
-    # 流水帳輸出 (依日期正向排序)
     display_dates = [d for d in all_dates if start_date <= d <= end_date]
 
+    # 標題列
+    header = f"編號 {stock_id}"
+    if comp_id: header += f" vs {comp_id}"
+    print(f"{header} ( {start_date} ~ {end_date} )")
+    
+    line_len = 50 if not comp_id else 90
+    print("=" * line_len)
+    
+    col_header = f"{'Date':<12}\t{ma_key:<8}\t{'限價':<8}\t{'幅度':<8}"
+    if comp_id:
+        col_header += f"\t | \t{comp_id}限價\t{comp_id}幅度"
+    print(col_header)
+    print("-" * line_len)
+
+    # 流水帳輸出
     for date in display_dates:
         info = ma_data[date]
         ma_val = info[ma_key]
         close_val = info['close']
-        
         diff_pct = (close_val - ma_val) / ma_val * 100
         
-        diff_str = f"{diff_pct:.2f}%"
-        abs_diff = abs(diff_pct)
-        if abs_diff >= 15:
-            diff_str = f"{Color.RED}{diff_str}{Color.END}"
-        elif abs_diff >= 10:
-            diff_str = f"{Color.ORANGE}{diff_str}{Color.END}"
+        def get_colored_diff(pct):
+            s = f"{pct:.2f}%"
+            a = abs(pct)
+            if a >= 15: return f"{Color.RED}{s}{Color.END}"
+            if a >= 10: return f"{Color.ORANGE}{s}{Color.END}"
+            return s
 
-        print(f"{date:<12}\t{ma_val:<8.2f}\t{close_val:<8.2f}\t{diff_str}")
+        row = f"{date:<12}\t{ma_val:<8.2f}\t{close_val:<8.2f}\t{get_colored_diff(diff_pct)}"
+        
+        if comp_id and comp_data and date in comp_data:
+            c_info = comp_data[date]
+            c_close = c_info['close']
+            c_ma = c_info[ma_key]
+            c_diff = (c_close - c_ma) / c_ma * 100
+            row += f"\t | \t{c_close:<8.2f}\t{get_colored_diff(c_diff)}"
+            
+        print(row)
 
     print() # 空一行
     # 5. 預測未來 (假設限價持平)
