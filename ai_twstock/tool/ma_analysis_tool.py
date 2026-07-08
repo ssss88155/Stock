@@ -132,6 +132,7 @@ def main():
 
         print(f"{date:<12}\t{ma_val:<8.2f}\t{close_val:<8.2f}\t{diff_str}")
 
+    print() # 空一行
     # 5. 預測未來 (假設限價持平)
     print("\n預測未來 (假設限價持平於最新價格)")
     print("-" * 50)
