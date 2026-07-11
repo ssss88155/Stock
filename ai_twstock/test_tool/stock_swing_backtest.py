@@ -9,7 +9,7 @@ from scipy.signal import argrelextrema
 DB_PATH = r'C:\jupyter_notebook\ai_twstock\data\SQL_DB\taiwan_stock_micro.db'
 OUTPUT_DIR = r'C:\jupyter_notebook\ai_twstock\test_tool'
 STOCK_ID = '0050'
-START_DATE = '2026-05-01'
+START_DATE = '2026-01-01'
 END_DATE = '2026-06-15'
 INITIAL_CAPITAL = 30000
 

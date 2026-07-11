@@ -42,8 +42,8 @@ def check_usage_and_protection(api, name=""):
         ratio = usage / limit
         # 強制印出當前使用量
         print(f"\r      [Usage] {name}: {ratio:.1%} ({usage}/{limit})", end="")
-        if ratio >= 0.96:
-            print(f"\n[PROTECTION] {name} 流量達標 96%! Cooldown (60s)...")
+        if ratio >= 0.95:
+            print(f"\n[PROTECTION] {name} 流量達標 95%! Cooldown (60s)...")
             for _ in range(60):
                 if shutdown_event.is_set(): break
                 time.sleep(1)
@@ -393,8 +393,7 @@ def main():
     temp_micro_dates = pd.date_range(end=micro_end_date, periods=10, freq='B').strftime('%Y-%m-%d').tolist()
     micro_end_date = [d for d in temp_micro_dates if d <= micro_end_date and d not in holidays][-1]
 
-    start_date_str = (now - timedelta(days=860)).strftime('%Y-%m-%d')
-    
+    start_date_str = (now - timedelta(days=20)).strftime('%Y-%m-%d')  #940
     # 修正：如果今天被誤植在假日檔中，先在記憶體中排除它，確保今天能被正確抓取
     if today_str in holidays:
         print(f"      [Notice] 偵測到今日 {today_str} 被誤植於假日檔，已在本次執行中暫時排除。")
@@ -443,7 +442,7 @@ def main():
             except Exception as e:
                 print(f"\n      [Error] {sid}: {e}")
     print("\n      Phase 1 Completed.")
-    
+
     # --- PHASE 2: MICRO DATA (Dynamic Multi-threaded) ---
     print(f"\n>>> PHASE 2: Fetching Micro Data (Workers: {args.workers}, API Threads: {current_api_threads}, Fast-Check Enabled)")
     print(f"      Target End Date: {micro_end_date}")
@@ -467,7 +466,7 @@ def main():
                     print(f"\r      Progress: {i+1}/{len(stocks)} stocks checked/processed. (Last: {sid})", end="")
             except Exception as e:
                 print(f"\n      [Error] {sid}: {e}")
-    
+
     end_time = time.time()
     duration = end_time - start_time
     hours, rem = divmod(duration, 3600)

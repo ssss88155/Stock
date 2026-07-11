@@ -110,7 +110,7 @@ STRATEGY_MODES = {
     'HOLY_GRAIL_BREAKOUT': {'STOP_LOSS': -0.05, 'TAKE_PROFIT': 9.99, 'BREAK_EVEN_TRIGGER': 0.06, 'HOLD_DAYS': 20, 'PARTIAL_EXIT_GAIN': 0.10, 'TRAILING_STOP_NORMAL': 0.08},
     'VOLATILITY': {'STOP_LOSS': -0.08, 'TAKE_PROFIT': 9.99, 'BREAK_EVEN_TRIGGER': 0.05, 'HOLD_DAYS': 10},
     'SCALPING': {'STOP_LOSS': -0.03, 'TAKE_PROFIT': 0.06, 'BREAK_EVEN_TRIGGER': 0.03, 'HOLD_DAYS': 1},
-    'WASH_OUT_DIP': {'STOP_LOSS': -0.05, 'TAKE_PROFIT': 0.10, 'HOLD_DAYS': 5},
+    'WASH_OUT_DIP': {'STOP_LOSS': -0.07, 'TAKE_PROFIT': 0.12, 'HOLD_DAYS': 5, 'BREAK_EVEN_TRIGGER': 0.04},
     'LOW_ENTRY': {'STOP_LOSS': -0.05, 'TAKE_PROFIT': 9.99, 'BREAK_EVEN_TRIGGER': 0.08, 'HOLD_DAYS': 40, 'MAX_MOMENTUM': 45}
 }
 BACKTEST_CONFIG = {'STARTING_CASH': 2000000, 'TOP_N': 8, 'MIN_TRADING_VALUE': 30000000}
@@ -185,34 +185,114 @@ def calculate_momentum_score(details, weights=DEFAULT_WEIGHTS):
     return score
 
 
-def calculate_dip_score(details):
+def check_ma_slope(price_data, sorted_dates, idx, window=60, lookback=5):
+    """A. 長期壓制力：計算均線斜率 (Slope)"""
+    if idx < window + lookback: return 0
+    
+    def get_ma(target_idx):
+        prices = [price_data[sorted_dates[i]]['close'] for i in range(target_idx - window + 1, target_idx + 1)]
+        return sum(prices) / window
+
+    ma_curr = get_ma(idx)
+    ma_prev = get_ma(idx - lookback)
+    slope = (ma_curr - ma_prev) / ma_prev if ma_prev > 0 else 0
+    return slope
+
+def check_ma5_turnaround(price_data, sorted_dates, idx):
+    """B. 短期奮起力：MA5 勾頭向上且股價站上 MA5"""
+    if idx < 5: return False, False
+    
+    prices_curr = [price_data[sorted_dates[i]]['close'] for i in range(idx - 4, idx + 1)]
+    ma5_curr = sum(prices_curr) / 5
+    
+    prices_prev = [price_data[sorted_dates[i]]['close'] for i in range(idx - 5, idx)]
+    ma5_prev = sum(prices_prev) / 5
+    
+    is_ma5_up = ma5_curr > ma5_prev
+    is_above_ma5 = price_data[sorted_dates[idx]]['close'] > ma5_curr
+    return is_ma5_up, is_above_ma5
+
+def check_price_gap(price_data, sorted_dates, idx, ma_window=20):
+    """C. 乖離空間：計算股價與均線的負乖離"""
+    if idx < ma_window: return 0
+    prices = [price_data[sorted_dates[i]]['close'] for i in range(idx - ma_window + 1, idx + 1)]
+    ma = sum(prices) / ma_window
+    curr_close = price_data[sorted_dates[idx]]['close']
+    gap = (curr_close - ma) / ma if ma > 0 else 0
+    return gap
+
+def check_broker_handover(stock_info, date, micro_features):
+    """D. 籌碼大換手：穩重券商買入 vs 炒作券商買入"""
+    report = stock_info.get('trading_daily_report', {}).get(date, {})
+    stable_buy_qty = 0
+    manipulation_buy_qty = 0
+    top_buyers = report.get('top_buyers', [])
+    
+    for b in top_buyers:
+        bid = str(b.get('trader_id', '')).strip()
+        if bid in micro_features:
+            stability = micro_features[bid].get('穩重指數', 0)
+            qty = b.get('net', 0)
+            if stability > 40: stable_buy_qty += qty
+            elif stability < -40: manipulation_buy_qty += qty
+            
+    if stable_buy_qty == 0: return 0
+    # 換手強度比例
+    ratio = stable_buy_qty / (manipulation_buy_qty + 1)
+    return ratio
+
+def calculate_dip_score_v4(sid, date, data, micro_features):
     """
-    逆勢軌道評分系統 2.0
-    維度：跌幅深度、縮量程度、價格止跌強度、趨勢底氣、券商籌碼、動能交叉
+    低點轉折權重模型 4.0 (Function 化評分流程)
     """
+    stock_info = data[sid]
+    price_data = stock_info['price']
+    sorted_dates = stock_info['sorted_dates']
+    idx = stock_info['date_to_idx'][date]
+    
     score = 0
-    # 1. 跌幅深度 (權重 15)
-    score += min(15, abs(details['prev_gain']) * 150)
-    # 2. 縮量程度 (權重 15)
-    score += max(0, (1 - details['vol_ratio']) * 15)
-    # 3. 價格止跌強度 (權重 15)
-    if details['is_red_candle']: score += 15
-    
-    # 4. 【強勢回檔加分】趨勢底氣 (權重 20)
-    if details.get('is_above_ma60', False): score += 20
-    
-    # 5. 【券商籌碼加分】(權重 20)
-    # 邏輯：(穩重買入 - 炒作買入) 為正，代表炒作券商在賣、穩重券商在接
-    broker_net = details.get('broker_manipulation_net', 0)
-    if broker_net > 0:
-        score += min(20, broker_net * 2)
-        
-    # 6. 【動能交叉加分】(權重 15)
-    # 邏輯：MA5 轉折或黃金交叉
-    if details.get('is_golden_cross', False): score += 15
-    elif details.get('is_ma5_up', False): score += 7
-        
-    return score
+    details = {}
+
+    # 1. 長期壓制力 (MA60 & MA20 斜率)
+    slope60 = check_ma_slope(price_data, sorted_dates, idx, window=60)
+    slope20 = check_ma_slope(price_data, sorted_dates, idx, window=20)
+    if slope60 < 0 and slope20 < 0:
+        score += 15
+        details['downward_pressure'] = True
+
+    # 2. 短期奮起力 (MA5 Turnaround)
+    is_ma5_up, is_above_ma5 = check_ma5_turnaround(price_data, sorted_dates, idx)
+    if is_ma5_up and is_above_ma5:
+        score += 30
+        details['ma5_奮起'] = True
+    elif is_ma5_up:
+        score += 10
+
+    # 3. 乖離空間 (負乖離)
+    gap20 = check_price_gap(price_data, sorted_dates, idx, ma_window=20)
+    if gap20 < -0.10:
+        score += 25
+        details['extreme_gap'] = gap20
+    elif gap20 < -0.05:
+        score += 10
+
+    # 4. 籌碼大換手
+    handover_ratio = check_broker_handover(stock_info, date, micro_features)
+    if handover_ratio > 5:
+        score += 30
+        details['strong_handover'] = handover_ratio
+    elif handover_ratio > 2:
+        score += 15
+
+    # 5. 強勢股底氣 (MA60 之上)
+    curr_close = price_data[date]['close']
+    prices_60 = [price_data[sorted_dates[i]]['close'] for i in range(max(0, idx-59), idx+1)]
+    ma60 = sum(prices_60) / len(prices_60)
+    if curr_close > ma60:
+        score += 20
+        details['strong_base'] = True
+
+    return score, details
 
 
 def calculate_day_trading_signal(sid, date, data, micro_features):

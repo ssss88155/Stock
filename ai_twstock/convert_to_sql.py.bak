@@ -1,0 +1,105 @@
+import json
+import sqlite3
+import os
+import ijson
+
+def create_db(db_path):
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS daily_prices (
+            stock_id TEXT,
+            date TEXT,
+            open REAL,
+            high REAL,
+            low REAL,
+            close REAL,
+            volume INTEGER,
+            foreign_buy INTEGER,
+            sitc_buy INTEGER,
+            dealer_buy INTEGER,
+            PRIMARY KEY (stock_id, date)
+        )
+    ''')
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS broker_details (
+            stock_id TEXT,
+            date TEXT,
+            trader_name TEXT,
+            trader_id TEXT,
+            net_qty INTEGER,
+            avg_price REAL,
+            is_buy BOOLEAN
+        )
+    ''')
+    
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_broker_lookup ON broker_details (stock_id, date)')
+    
+    # 清空舊資料
+    cursor.execute('DELETE FROM daily_prices')
+    cursor.execute('DELETE FROM broker_details')
+    
+    conn.commit()
+    return conn
+
+def import_prices(conn, json_path):
+    print(f"正在匯入價格資料: {json_path}")
+    with open(json_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    
+    cursor = conn.cursor()
+    for sid, info in data.items():
+        prices = info.get('price', {})
+        inst = info.get('institutional', {})
+        for date, p in prices.items():
+            i = inst.get(date, {})
+            f_buy = i.get('Foreign_Investor', {}).get('buy', 0) - i.get('Foreign_Investor', {}).get('sell', 0)
+            s_buy = i.get('Investment_Trust', {}).get('buy', 0) - i.get('Investment_Trust', {}).get('sell', 0)
+            d_buy = i.get('Dealer', {}).get('buy', 0) - i.get('Dealer', {}).get('sell', 0)
+            
+            cursor.execute('INSERT OR REPLACE INTO daily_prices VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+                         (sid, date, p.get('open'), p.get('max'), p.get('min'), p.get('close'), p.get('Trading_Volume'), f_buy, s_buy, d_buy))
+    conn.commit()
+
+def import_brokers_streaming(conn, json_path):
+    print(f"正在以串流方式匯入分點資料: {json_path}")
+    cursor = conn.cursor()
+    count = 0
+    
+    with open(json_path, 'r', encoding='utf-8') as f:
+        # 使用 ijson 逐個物件讀取
+        parser = ijson.kvitems(f, '')
+        for sid, info in parser:
+            reports = info.get('trading_daily_report', {})
+            for date, report in reports.items():
+                for key, is_buy in [('top_buyers', True), ('top_sellers', False)]:
+                    for t in report.get(key, []):
+                        trader_str = str(t.get('trader', ''))
+                        t_name, t_id = trader_str.split('/') if '/' in trader_str else (trader_str, '')
+                        
+                        # 關鍵修正：識別 net_b, net_s, net 並轉換類型 (Decimal -> float/int)
+                        qty_raw = t.get('net_b', t.get('net_s', t.get('net', 0)))
+                        qty = int(abs(float(qty_raw)))
+                        avg_p = float(t.get('avg_p', 0))
+                        
+                        cursor.execute('INSERT INTO broker_details VALUES (?, ?, ?, ?, ?, ?, ?)', 
+                                     (sid, date, t_name, t_id, qty, avg_p, is_buy))
+            count += 1
+            if count % 50 == 0:
+                print(f"已處理 {count} 檔股票分點...")
+                conn.commit()
+    conn.commit()
+
+if __name__ == "__main__":
+    DB_PATH = r"C:\jupyter_notebook\ai_twstock\data\SQL_DB\taiwan_stock_micro.db"
+    PRICE_JSON = r"C:\jupyter_notebook\ai_twstock\stock_data.json"
+    BROKER_JSON = r"C:\jupyter_notebook\ai_twstock\stock_data_micro.json"
+    
+    conn = create_db(DB_PATH)
+    import_prices(conn, PRICE_JSON)
+    import_brokers_streaming(conn, BROKER_JSON)
+    conn.close()
+    print(f"轉換完成！資料庫位於: {DB_PATH}")

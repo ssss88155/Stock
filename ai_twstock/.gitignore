@@ -13,3 +13,5 @@ output.txt
 data_independent_price/
 data_independent_microstructure/
 stock_data.json
+*.pkl
+config/find_mind_config.json
